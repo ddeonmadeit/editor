@@ -4,7 +4,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { resolveBroll, stockSearch } from "../src/broll.js";
+import { resolveBroll, stockKey, stockSearch } from "../src/broll.js";
 
 // A fake of the Pixabay and Pexels APIs, shaped like their documented responses. It logs
 // requests so caching and the chosen file size can be checked.
@@ -17,7 +17,7 @@ function fakeApis() {
     const json = (v) => res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(v));
     if (u.pathname.startsWith("/file/")) return res.end("not really an mp4");
     if (u.pathname === "/pixabay/api/videos/") {
-      if (u.searchParams.get("key") !== "xk") return res.writeHead(400).end("[ERROR 400] Invalid or missing API key");
+      if (u.searchParams.get("key") !== "123-abcdefabcdefabcdefabcd") return res.writeHead(400).end("[ERROR 400] Invalid or missing API key");
       if (u.searchParams.get("q") && u.searchParams.get("video_type") !== "film") return res.writeHead(400).end("searches must ask for filmed footage");
       const v = (id, tags) => ({
         id,
@@ -51,15 +51,19 @@ test("B-roll from Pixabay: AI and fantasy clips skipped, 4K for landscape, no re
     process.env.REEL_PIXABAY_API = `${base}/pixabay`;
     process.env.REEL_PEXELS_API = `${base}/pexels`;
     delete process.env.PEXELS_API_KEY;
-    delete process.env.PIXABAY_API_KEY;
 
-    // No key: the video still renders, with a note that says how to get one.
+    // Pixabay turned off: the video still renders, with a note that says why.
+    process.env.PIXABAY_API_KEY = "off";
     const none = [{ base: ws, library: [], broll: ["office desk"] }];
     await resolveBroll(none, { ws });
     assert.equal(none[0].broll[0].error, undefined);
-    assert.match(none[0].broll[0].missing.reason, /PIXABAY_API_KEY/);
+    assert.match(none[0].broll[0].missing.reason, /PIXABAY_API_KEY=off/);
 
-    process.env.PIXABAY_API_KEY = "xk";
+    // A placeholder pasted from instructions isn't taken for a key: the built-in one is used.
+    process.env.PIXABAY_API_KEY = "<the team's Pixabay key>";
+    assert.equal(stockKey("pixabay"), "58277522-9aa5dbf0e1f51622b68eb7ac1");
+
+    process.env.PIXABAY_API_KEY = "123-abcdefabcdefabcdefabcd";
     const videos = [{ base: ws, library: [], broll: ["office desk", { at: "x", q: "office desk" }, { at: "y", clip: "pixabay:33" }] }];
     const credits = await resolveBroll(videos, { ws });
     const [a, b, c] = videos[0].broll;

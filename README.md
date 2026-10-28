@@ -67,10 +67,10 @@ reel skill          # optional: teach Claude Code the workflow in every folder
 macOS: `brew install ffmpeg python`. Ubuntu: `apt install ffmpeg python3-venv`.
 ### Stock B-roll (Pixabay)
 
-Put a Pixabay API key in `.env` in the repo (or the footage folder): `PIXABAY_API_KEY=...`.
-Keys are free: make a Pixabay account and copy yours from <https://pixabay.com/api/docs/>.
-`.env` is git-ignored; never commit a key. Searches are cached for a day (Pixabay asks for
-that), and only the clips actually used are downloaded.
+A Pixabay API key is built in, so stock B-roll works with no setup. To use your own,
+put `PIXABAY_API_KEY=...` in `.env` (repo or footage folder; free at
+<https://pixabay.com/api/docs/>); `PIXABAY_API_KEY=off` turns Pixabay off. Searches are
+cached for a day (Pixabay asks for that), and only the clips actually used are downloaded.
 
 Pixabay accepts AI-generated uploads, which its API can't filter, so reel drops clips whose
 tags or page name say AI-generated, 3D, animation, CGI or fantasy; Pixabay tags most AI

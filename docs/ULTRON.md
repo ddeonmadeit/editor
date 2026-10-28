@@ -22,13 +22,11 @@ fast and cheap.
 git clone --recursive https://github.com/ddeonmadeit/editor ~/reel-editor
 cd ~/reel-editor && npm install && npm link     # puts `reel` on PATH
 reel setup                                      # transcription model, hook renderer, hook-gen; checks ffmpeg
-echo "PIXABAY_API_KEY=<the team's Pixabay key>" >> ~/reel-editor/.env   # stock B-roll
 reel styles                                     # should list looks: getknown, green, orange, white
 reel broll "air conditioner"                    # should list Pixabay clips (proves the key works)
 ```
 
-The team will give you the Pixabay key. It lives only in `~/reel-editor/.env`: never put
-it in a batch file, a report, a commit or anywhere public.
+Stock B-roll comes from Pixabay with a key built into reel: nothing to set up.
 
 Needs Node 20+, Python 3 and ffmpeg (`brew install ffmpeg` on a Mac). If `reel` isn't found
 later, use `node ~/reel-editor/bin/reel.js` instead. Don't also run `reel skill`; this file
@@ -213,7 +211,6 @@ Notes: <anything odd, anything reel couldn't do, anything that needed a second t
 | `"..." isn't in the edited video (closest: "...")` | use the closest phrase, or a phrase from a line you didn't drop |
 | `unknown key "..." (did you mean "..."?)` | fix the key name |
 | `no B-roll for "..." (no good match on pixabay; try other words)` | rephrase `q` as a concrete scene and re-render that video, or drop that B-roll |
-| `no B-roll for "..." (PIXABAY_API_KEY isn't set ...)` | add the key to `~/reel-editor/.env` (ask the team for it) |
 | `Pixabay rate limit hit` | wait a minute and re-render (limit: 100 searches a minute) |
 | `faster-whisper isn't installed` / `can't start a browser` | run `reel setup` |
 | `nothing left after cutting` | you dropped every line; check `drop` |

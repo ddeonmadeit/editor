@@ -109,6 +109,10 @@ const SITES = {
   pixabay: {
     name: "Pixabay",
     env: ["PIXABAY_API_KEY", "PIXABAY_KEY"],
+    // The team's key, built in so B-roll works with no setup. PIXABAY_API_KEY overrides it;
+    // PIXABAY_API_KEY=off turns Pixabay off.
+    builtin: "58277522-9aa5dbf0e1f51622b68eb7ac1",
+    keyPattern: /^\d+-[0-9a-f]{20,}$/i,
     get: (url) => getJSON(url, {}, "Pixabay"),
     map: (v) => {
       const sizes = Object.values(v.videos || {}).filter((f) => f && f.url);
@@ -128,9 +132,20 @@ const SITES = {
   },
 };
 
-export const stockKey = (site) => SITES[site]?.env.map((e) => process.env[e]).find(Boolean) || "";
+// A site's key: from the environment, else the built-in one. A value that can't be a key
+// (e.g. a "<placeholder>" copied from instructions) is ignored; "off" turns the site off.
+export function stockKey(site) {
+  const s = SITES[site];
+  if (!s) return "";
+  for (const name of s.env) {
+    const v = (process.env[name] || "").trim();
+    if (v.toLowerCase() === "off") return "";
+    if (v && (!s.keyPattern || s.keyPattern.test(v))) return v;
+  }
+  return s.builtin || "";
+}
 export const stockSites = (order = DEFAULT_STOCK) => [].concat(order).filter((s) => SITES[s] && stockKey(s));
-export const NO_KEY = "PIXABAY_API_KEY isn't set: make a free Pixabay account, copy the key from https://pixabay.com/api/docs/ into .env";
+export const NO_KEY = "no stock site to search (Pixabay is turned off with PIXABAY_API_KEY=off, or the batch's stock: list only names sites without a key)";
 
 // Searches one site (results cached on disk for a day, which Pixabay requires and which
 // saves requests). Vertical clips first.

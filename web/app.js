@@ -31,7 +31,7 @@ async function loadStatus() {
   $("status").innerHTML = [
     chip(s.ffmpeg, s.ffmpeg ? `ffmpeg ${s.ffmpeg.version}` : "ffmpeg missing"),
     chip(s.hookgen, "hook-gen"),
-    chip(s.stock.length, s.stock.length ? `B-roll: library + ${s.stock.join(", ")}` : "B-roll: no Pixabay key"),
+    chip(s.stock.length, s.stock.length ? `B-roll: library + ${s.stock.join(", ")}` : "B-roll: library only"),
   ].join("");
   $("newLook").innerHTML = s.looks.map((l) => `<option ${l === "white" ? "selected" : ""}>${esc(l)}</option>`).join("");
   $("mcpCfg").textContent = JSON.stringify({ mcpServers: { reel: { command: "npx", args: ["reel", "mcp"], cwd: s.workspace } } }, null, 2);

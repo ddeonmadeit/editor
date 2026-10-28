@@ -105,9 +105,9 @@ nothing matches most of the words, the video renders without that clip and the p
 so: rephrase and re-render. Describe the scene, not just the object ("worker laying floor
 tiles", not "floor tiles"). Clips used are listed in `out/credits.txt`.
 
-Pixabay needs `PIXABAY_API_KEY` (free: make an account, the key is on
-pixabay.com/api/docs) in the environment or a `.env` file. Searches are cached for a day.
-An existing `PEXELS_API_KEY` also works and is tried first.
+A Pixabay key is built in; `PIXABAY_API_KEY` in the environment or `.env` overrides it, and
+`PIXABAY_API_KEY=off` turns Pixabay off. Searches are cached for a day. An existing
+`PEXELS_API_KEY` also works and is tried first.
 
 ```yaml
 broll:

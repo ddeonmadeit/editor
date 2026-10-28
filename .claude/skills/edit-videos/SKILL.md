@@ -77,4 +77,4 @@ Everything else: `reel help spec`. B-roll candidates for a phrase: `reel broll "
 If `reel` isn't on PATH, run it as `node <editor repo>/bin/reel.js` (or `npm link` once in
 the repo).
 `reel setup` installs/checks ffmpeg, faster-whisper, the hook renderer and hook-gen.
-Pixabay B-roll needs `PIXABAY_API_KEY` in the environment or `.env` (free at pixabay.com/api/docs).
+Pixabay B-roll works out of the box (a key is built in; `PIXABAY_API_KEY` overrides it).
