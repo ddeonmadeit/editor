@@ -22,7 +22,7 @@ videos:
 ## Keys (per video, or under `defaults:`)
 - src (file/glob), name, use (look), drop [3, 5-7], keep, cut ["phrase", {from,to}], retakes: auto, fillers, pacing tight|normal|loose|off, trim [s,e], speed
 - hook: "text" | {text, preset: tiktok-classic|get-known, style{...hook-gen}, dur 4, y 0.5, size 84, png}
-- captions: white|orange|green|tiktok|bold|false | {style, size, y, words, chars, case, active, shadow, pop}; highlight [words]
+- captions: white|orange|green|tiktok|bold|false | {style, size, y, words, chars, case, active, shadow, pop}; highlight [words]; fix {misheard: Correct} (caption spelling)
 - broll: ["phrase"] | {at: phrase|seconds|{line}, to, dur, q|src|pexels: query|id, from, layout full|split, audio}; library [dirs] (default broll/)
 - texts [{at, text, style red|white|yellow|green, y top|center|bottom, count, dur}], flash [{at, color, dur}], music {src, volume, duck}, sfx [{at, src}]
 - zoom 1.1, focus 0.35, fit cover|blur, grade punchy|warm|cool|film|bw|file.cube, audio {loudness -14, enhance, denoise}, quality draft|high|max, encoder auto|x264|videotoolbox|nvenc

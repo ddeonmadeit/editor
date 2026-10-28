@@ -9,7 +9,7 @@ import { HOOKGEN_FONT_PX, renderHooks } from "./hooks.js";
 import { probe } from "./media.js";
 import { renderPlan } from "./render.js";
 import { CAPTION_STYLES, POSITIONS, captionStyle } from "./styles.js";
-import { buildLines, closest, findPhrase } from "./transcript.js";
+import { applyFixes, buildLines, closest, findPhrase } from "./transcript.js";
 import { ingest, loadTranscript, wordsOf } from "./transcribe.js";
 import { H, IMAGE_EXT, ROOT, W, ensureDir, expandVideos, fmtDur, pngSize, pool, renderSlot, round, stateDir } from "./util.js";
 
@@ -27,6 +27,7 @@ export const DEFAULTS = {
   hook: { preset: "tiktok-classic", dur: 4, y: 0.5, size: 84, maxWidth: 1000, style: {} },
   captions: { style: "white", afterHook: true },
   highlight: [],
+  fix: {}, // caption spelling: { parks: Parkes, "Travel Pinot": Travelpreneur }
   broll: [], // clips over the speaker: "phrase" | { at, q | src | pexels, dur, layout }
   library: ["broll"], // your B-roll folders, searched before Pexels
   texts: [],
@@ -135,7 +136,9 @@ export function loadBatch(input, { ws = process.cwd() } = {}) {
 
 // Resolves `at:` (seconds, a phrase, or { line: n }) to an output time window.
 function locate(ref, ctx, label) {
-  const { kept, lines, speed, outDur } = ctx;
+  const { kept, orig, lines, speed, outDur } = ctx;
+  // Phrases may use the fixed spelling or the transcript's (indices are the same).
+  const find = (q, from = 0) => findPhrase(kept, q, { from }) || findPhrase(orig, q, { from });
   const at = isObj(ref) && ref.at === undefined && ref.line !== undefined ? { line: ref.line } : ref.at;
   let t0, t1, from = 0;
   if (typeof at === "number") t0 = at;
@@ -146,7 +149,7 @@ function locate(ref, ctx, label) {
     t0 = kept[k].os / speed;
     from = k;
   } else if (typeof at === "string") {
-    const m = findPhrase(kept, at);
+    const m = find(at);
     if (!m) {
       const near = closest(kept, at);
       throw new Error(`${label}: "${at}" isn't in the edited video${near ? ` (closest: "${near}")` : ""}`);
@@ -159,7 +162,7 @@ function locate(ref, ctx, label) {
   if (ref.to !== undefined) {
     if (typeof ref.to === "number") t1 = ref.to;
     else {
-      const m = findPhrase(kept, ref.to, { from });
+      const m = find(ref.to, from);
       if (!m) throw new Error(`${label}: to "${ref.to}" not found`);
       t1 = kept[m.w1].oe / speed;
     }
@@ -184,8 +187,8 @@ export async function planVideo(v, { ws, outDir, hookFiles }) {
   const outDur = edit.duration / speed;
   const zoom = Number(v.zoom) || 1;
   const segments = edit.segments.map((s, k) => ({ s: s.s, e: s.e, zoom: zoom > 1 && k % 2 === 1 ? zoom : 1 }));
-  const kept = edit.kept;
-  const ctx = { kept, lines, speed, outDur };
+  const kept = applyFixes(edit.kept, v.fix);
+  const ctx = { kept, orig: edit.kept, lines, speed, outDur };
   const id = v.name || t.id;
   const plan = {
     id,
@@ -288,7 +291,7 @@ export async function planVideo(v, { ws, outDir, hookFiles }) {
   if (v.captions && v.captions !== false && v.captions.style !== "none") {
     tryAdd("captions", () => {
       const style = captionStyle(v.captions);
-      const words = kept.map((w) => ({ ...w, os: w.os / speed, oe: w.oe / speed }));
+      const words = kept.filter((w) => w.w).map((w) => ({ ...w, os: w.os / speed, oe: w.oe / speed }));
       let chunks = chunkWords(words, { words: style.words, chars: style.chars });
       if (hookEnd && v.captions.afterHook !== false) chunks = chunks.filter((c) => c.end > hookEnd + 0.05).map((c) => (c.start < hookEnd ? { ...c, start: hookEnd } : c));
       events.push(...captionEvents(chunks, style, { highlight: v.highlight || [] }));

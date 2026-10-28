@@ -8,7 +8,7 @@ import { scanLibrary, searchLibrary } from "../src/broll.js";
 import { captionEvents, chunkWords, parseNumber, textEvents } from "../src/captions.js";
 import { buildEdit } from "../src/edl.js";
 import { captionStyle } from "../src/styles.js";
-import { buildLines, closest, findPhrase, formatTranscript, parseIds } from "../src/transcript.js";
+import { applyFixes, buildLines, closest, findPhrase, formatTranscript, parseIds } from "../src/transcript.js";
 import { mergeWords } from "../src/transcribe.js";
 import { FPS, assColor } from "../src/util.js";
 
@@ -69,6 +69,20 @@ test("phrases are found ignoring case and punctuation", () => {
   assert.deepEqual(findPhrase(words, "$50,000 on"), { w0: 2, w1: 3 });
   assert.equal(findPhrase(words, "second motel"), null);
   assert.equal(closest(words, "locked into"), "locked in");
+});
+
+test("spelling fixes replace words and phrases, keeping punctuation and indices", () => {
+  const words = fakeWords(["I stayed in parks, at Travel Pinot University.", "Parks is great."]);
+  const fixed = applyFixes(words, { parks: "Parkes", "Travel Pinot": "Travelpreneur" });
+  assert.equal(fixed.length, words.length);
+  assert.deepEqual(
+    fixed.map((w) => w.w).filter(Boolean),
+    ["I", "stayed", "in", "Parkes,", "at", "Travelpreneur", "University.", "Parkes", "is", "great."],
+  );
+  const tp = fixed.find((w) => w.w === "Travelpreneur");
+  assert.equal(tp.e, words[tp.i + 1].e); // spans both original words
+  assert.deepEqual(findPhrase(fixed, "Travelpreneur University"), { w0: 5, w1: 7 });
+  assert.equal(words[3].w, "parks,"); // input untouched
 });
 
 test("edit: drops, pause cuts, frame-aligned segments, output times", () => {

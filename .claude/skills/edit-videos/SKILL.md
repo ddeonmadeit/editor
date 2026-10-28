@@ -26,6 +26,8 @@ watch videos, extract frames, or write ffmpeg commands yourself: that is what bu
      `broll/` folder is searched first, then Pexels (real footage). Don't add B-roll over
      the hook or over emotional face-to-camera moments.
    - Optional: `highlight: ["$50,000"]`, `texts:` callouts, a different `use:` look.
+   - Names the transcript got wrong: `fix: { parks: Parkes }` (captions only; put
+     client-wide names under `defaults:`).
 3. `reel render edit.yaml` renders every video in parallel; one line per video.
    Then `reel check out/` (format/loudness) if you want proof.
 

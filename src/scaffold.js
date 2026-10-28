@@ -19,7 +19,7 @@ export async function newBatch(batchFile, inputs, { ws = process.cwd(), use = "w
     "# reel batch: write each hook (shown 0-4s), list the line numbers to cut in drop, then run: reel render " + path.relative(ws, dest),
     "# Transcript lines below are `n start text`; R>n = likely retake (redone in line n), pre-filled in drop. Remove from drop to keep.",
     "# More: broll, texts, highlight, music... see `reel help spec`.",
-    `use: ${use}`,
+    `use: ${YAML.stringify(use, { lineWidth: 0 }).trim()}`,
     "out: out",
     "videos:",
   ];
@@ -27,7 +27,7 @@ export async function newBatch(batchFile, inputs, { ws = process.cwd(), use = "w
     const t = r.transcript;
     const lines = buildLines(wordsOf(t));
     const retakes = lines.filter((l) => l.retakeOf).map((l) => l.id);
-    out.push(`  - src: ${YAML.stringify(path.relative(dir, r.src)).trim()}  # ${t.id} ${fmtDur(t.duration)}`);
+    out.push(`  - src: ${YAML.stringify(path.relative(dir, r.src), { lineWidth: 0 }).trim()}  # ${t.id} ${fmtDur(t.duration)}`);
     out.push(`    hook: ""`);
     out.push(`    drop: [${retakes.join(", ")}]`);
     for (const l of formatTranscript(t, lines, { header: false }).split("\n")) out.push(`    # ${l}`);

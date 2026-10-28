@@ -110,6 +110,36 @@ export function findPhrase(words, phrase, { allowed = () => true, from = 0 } = {
   return null;
 }
 
+// Spelling fixes for captions and phrase lookups: { parks: "Parkes", "Travel Pinot":
+// "Travelpreneur" }. Every match is replaced, keeping the punctuation around it. A
+// multi-word match becomes one word and the rest are left empty, so indices don't move.
+export function applyFixes(words, fixes) {
+  const out = words.map((w) => ({ ...w }));
+  for (const [from, to] of Object.entries(fixes || {})) {
+    const q = String(from).split(/\s+/).map(norm).filter(Boolean);
+    if (!q.length) continue;
+    for (let i = 0; i < out.length; i++) {
+      const hit = [];
+      for (let k = i; hit.length < q.length && k < out.length; k++) {
+        const n = norm(out[k].w);
+        if (!n && hit.length) continue; // an emptied word inside the match
+        if (n !== q[hit.length]) break;
+        hit.push(k);
+      }
+      if (hit.length < q.length) continue;
+      const first = out[hit[0]], last = out[hit[hit.length - 1]];
+      const lead = /^[^\p{L}\p{N}$]*/u.exec(first.w)[0];
+      const trail = /[^\p{L}\p{N}]*$/u.exec(last.w)[0];
+      first.w = `${lead}${to}${trail}`;
+      first.e = last.e;
+      if (last.oe !== undefined) first.oe = last.oe;
+      for (const h of hit.slice(1)) out[h].w = "";
+      i = hit[hit.length - 1];
+    }
+  }
+  return out;
+}
+
 // The closest phrase in the transcript to a query that wasn't found, for error messages.
 export function closest(words, phrase) {
   const q = String(phrase).split(/\s+/).map(norm).filter(Boolean);

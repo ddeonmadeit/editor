@@ -79,7 +79,12 @@ captions:
   pop: 0.12                # pop-in scale (0 = off)
   afterHook: true          # hide captions while the hook is up
 highlight: ["$50,000", "Monday"]   # words drawn in the style's highlight colour
+fix: { parks: Parkes, "Travel Pinot": Travelpreneur }   # caption spelling (names, brands)
 ```
+
+`fix` corrects what the captions show (and what `at:` phrases match) without touching the
+audio. Keys are matched case- and punctuation-insensitively; several words can become one.
+Put client-wide names under `defaults:` or in the client's look file.
 
 | style | look | from |
 |---|---|---|
