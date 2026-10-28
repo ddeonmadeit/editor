@@ -161,12 +161,24 @@ async function searchSite(site, q, { ws, minDur = 2 }) {
   // Stock search is loose (Pixabay ranks by popularity), so rank by how many of the asked-for
   // words the clip's tags/title actually have; vertical and long-enough only break ties.
   const want = [...new Set(tokensOf(q))];
+  const hits = (w, words) => words.some((x) => x === w || sameRoot(w, x));
   const rel = (c) => {
-    const have = new Set(tokensOf([c.title, c.page].filter(Boolean).join(" ")));
-    return want.length ? want.filter((w) => have.has(w) || [...have].some((x) => sameRoot(w, x))).length / want.length : 0;
+    const have = tokensOf([c.title, c.page].filter(Boolean).join(" "));
+    return want.length ? want.filter((w) => hits(w, have)).length / want.length : 0;
+  };
+  // Tags come most-relevant first: a clip whose first tags match beats one where the words
+  // are incidental (a "construction worker" request shouldn't get ants at work).
+  const tagFocus = (c) => {
+    const tags = String(c.title || c.page || "").split(/,|\/|-/).map((t) => tokensOf(t)).filter((t) => t.length);
+    return Math.round(want.reduce((sum, w) => {
+      const i = tags.findIndex((t) => hits(w, t));
+      return sum + (i < 0 ? 0 : 1 / (1 + i));
+    }, 0) * 10) / 10;
   };
   const vertical = (c) => c.height > c.width;
-  const ranked = list.map((c) => ({ ...c, rel: rel(c) })).sort((a, b) => b.rel - a.rel || vertical(b) - vertical(a) || (b.duration >= minDur) - (a.duration >= minDur));
+  const ranked = list
+    .map((c) => ({ ...c, rel: rel(c), focus: tagFocus(c) }))
+    .sort((a, b) => b.rel - a.rel || b.focus - a.focus || vertical(b) - vertical(a) || (b.duration >= minDur) - (a.duration >= minDur));
   // Clips that share no word with the request are only a last resort.
   return ranked.some((c) => c.rel > 0) ? ranked.filter((c) => c.rel > 0) : ranked;
 }
