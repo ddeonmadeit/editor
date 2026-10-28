@@ -106,7 +106,7 @@ export async function startMcp({ ws = process.cwd() } = {}) {
     async reel_broll({ q, library }) {
       const hit = searchLibrary(scanLibrary([abs(library || "broll")]), q);
       const lines = [hit ? `library: ${path.relative(ws, hit.file)} (${Math.round(hit.score * 100)}%)` : "library: no match"];
-      if (!stockSites().length) return text([...lines, manualHint(q, library || "broll")].join("\n"));
+      if (!stockSites().length) return text([...lines, ...(hit ? [] : [manualHint(q, library || "broll")])].join("\n"));
       try {
         const list = await stockSearch(q, { ws, perSite: 5 });
         lines.push(...(list.length ? list.map(formatStock) : ["stock: nothing found (try other words)"]));

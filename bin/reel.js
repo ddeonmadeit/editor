@@ -159,7 +159,7 @@ async function main() {
       const hit = searchLibrary(scanLibrary(dirs), q);
       say(hit ? `library: ${path.relative(ws, hit.file)} (match ${Math.round(hit.score * 100)}%)` : "library: no match");
       if (!stockSites().length) {
-        say(manualHint(q, path.relative(ws, dirs[0]) || "."));
+        if (!hit) say(manualHint(q, path.relative(ws, dirs[0]) || "."));
         break;
       }
       try {
