@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { formatPlan, listLooks, planBatch, renderBatch } from "../src/batch.js";
-import { describeLibrary, formatStock, scanLibrary, searchLibrary, stockSearch } from "../src/broll.js";
+import { describeLibrary, formatStock, manualHint, scanLibrary, searchLibrary, stockSearch, stockSites } from "../src/broll.js";
 import { HOOK_PRESETS, renderHooks } from "../src/hooks.js";
 import { ffmpegCaps } from "../src/media.js";
 import { check, formatCheck, sheet } from "../src/qa.js";
@@ -96,9 +96,10 @@ async function main() {
     }
     case "plan": {
       if (!pos[0]) throw new Error("usage: reel plan edit.yaml");
-      const { plans, warnings } = await planBatch(pos[0], { ws, only: opt.only && String(opt.only).split(","), onLog: log, renderHookPngs: !opt["no-hooks"] });
+      const { plans, warnings, needed } = await planBatch(pos[0], { ws, only: opt.only && String(opt.only).split(","), onLog: log, renderHookPngs: !opt["no-hooks"] });
       for (const w of warnings) say(`note: ${w}`);
       for (const p of plans) say(formatPlan(p, ws));
+      if (needed) say(`B-roll needed: ${needed.count} clip(s), no match in the library → ${needed.file}`);
       if (plans.some((p) => p.errors.length)) process.exitCode = 1;
       break;
     }
@@ -107,7 +108,7 @@ async function main() {
       const tty = process.stderr.isTTY || opt.progress;
       const prog = new Map();
       const draw = () => tty && process.stderr.write(`\r${[...prog].map(([id, p]) => `${id} ${p}%`).join("  ").slice(0, (process.stderr.columns || 120) - 1)}\x1b[K`);
-      const { results, warnings, secs } = await renderBatch(pos[0], {
+      const { results, warnings, secs, needed } = await renderBatch(pos[0], {
         ws,
         only: opt.only && String(opt.only).split(","),
         jobs: opt.jobs,
@@ -128,6 +129,7 @@ async function main() {
       for (const w of warnings) say(`note: ${w}`);
       const good = results.filter((r) => r.ok).length;
       say(`${good}/${results.length} rendered in ${Math.round(secs)}s`);
+      if (needed) say(`B-roll needed: ${needed.count} clip(s), no match in the library → ${needed.file}`);
       if (good < results.length) process.exitCode = 1;
       break;
     }
@@ -156,6 +158,10 @@ async function main() {
       const dirs = [].concat(opt.lib || "broll").map((d) => path.resolve(ws, d));
       const hit = searchLibrary(scanLibrary(dirs), q);
       say(hit ? `library: ${path.relative(ws, hit.file)} (match ${Math.round(hit.score * 100)}%)` : "library: no match");
+      if (!stockSites().length) {
+        say(manualHint(q, path.relative(ws, dirs[0]) || "."));
+        break;
+      }
       try {
         const list = await stockSearch(q, { ws, perSite: Number(opt.n) || 6 });
         for (const c of list) say(formatStock(c));

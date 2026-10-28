@@ -23,13 +23,13 @@ videos:
 - src (file/glob), name, use (look), drop [3, 5-7], keep, cut ["phrase", {from,to}], retakes: auto, fillers, pacing tight|normal|loose|off, trim [s,e], speed
 - hook: "text" | {text, preset: tiktok-classic|get-known, style{...hook-gen}, dur 4, y 0.5, size 84, png}
 - captions: white|orange|green|tiktok|bold|false | {style, size, y, words, chars, case, active, shadow, pop}; highlight [words]; fix {misheard: Correct} (caption spelling)
-- broll: ["phrase"] | {at: phrase|seconds|{line}, to, dur, q|src|clip "site:id"|coverr|pexels|pixabay: query, from, layout full|split, audio}; library [dirs] (default broll/); stock [pexels, coverr, pixabay] (sites with a key: COVERR_API_KEY, PEXELS_API_KEY, PIXABAY_API_KEY)
+- broll: ["phrase"] | {at: phrase|seconds|{line}, to, dur, q|src, from, layout full|split, audio}; library [dirs] (default broll/). Missing clips don't fail the render: they go on <batch>-broll-needed.md with a Pexels link + file name for a person to fill, then re-render. Optional PEXELS_API_KEY fills gaps automatically.
 - texts [{at, text, style red|white|yellow|green, y top|center|bottom, count, dur}], flash [{at, color, dur}], music {src, volume, duck}, sfx [{at, src}]
 - zoom 1.1, focus 0.35, fit cover|blur, grade punchy|warm|cool|film|bw|file.cube, audio {loudness -14, enhance, denoise}, quality draft|high|max, encoder auto|x264|videotoolbox|nvenc
 
 ## Other commands
 - `reel plan edit.yaml` check without rendering · `reel transcript <id>` · `reel sheet out/x.mp4` one contact-sheet image
-- `reel broll "query"` library + stock candidates · `reel library` list B-roll folder · `reel hook "text"` one hook PNG
+- `reel broll "query"` library match or Pexels link · `reel library` list B-roll folder · `reel hook "text"` one hook PNG
 - `reel serve` website + HTTP API (port 4317) · `reel mcp` MCP server (stdio)
 
 ## HTTP API

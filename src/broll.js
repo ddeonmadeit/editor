@@ -4,10 +4,13 @@ import path from "node:path";
 import YAML from "yaml";
 import { probe } from "./media.js";
 import { norm } from "./transcript.js";
-import { IMAGE_EXT, VIDEO_EXT, ensureDir, readJSON, sha1, stateDir, writeJSON } from "./util.js";
+import { IMAGE_EXT, VIDEO_EXT, ensureDir, readJSON, sha1, slug, stateDir, writeJSON } from "./util.js";
 
-// B-roll comes from the team's own folders first ("library"), then from stock sites with
-// real filmed footage (Pexels, Coverr, Pixabay; whichever have a key, in `stock:` order).
+// B-roll comes from the team's own folders first ("library"). When nothing there fits, a
+// stock site with an API key fills in (Pexels; Pixabay only if a batch opts in). Without a
+// key, the clip is listed in a "B-roll needed" file with a Pexels search link and the file
+// name to save it under; once someone drops it in the library, the next render uses it.
+// Pexels' terms forbid automated downloading from its website, so reel never does that.
 // Agents ask for a clip with a few words (`q: "air conditioner"`), never by browsing
 // footage, so finding B-roll costs almost no tokens.
 
@@ -65,7 +68,10 @@ export function searchLibrary(items, q, used = new Set()) {
 
 // ---------- stock sites ----------
 
-export const STOCK_SITES = ["pexels", "coverr", "pixabay"];
+export const STOCK_SITES = ["pexels", "pixabay"];
+// Sites tried when a batch doesn't say. Pixabay accepts AI uploads it can't filter, so a
+// batch has to ask for it (`stock: [pexels, pixabay]`).
+export const DEFAULT_STOCK = ["pexels"];
 const DAY = 24 * 3600 * 1000;
 const api = (site, fallback) => process.env[`REEL_${site.toUpperCase()}_API`] || fallback;
 
@@ -95,36 +101,6 @@ const SITES = {
       return this.map(await this.get(`${api("pexels", "https://api.pexels.com")}/videos/videos/${id}`, key));
     },
   },
-  coverr: {
-    name: "Coverr",
-    env: ["COVERR_API_KEY", "COVERR_KEY"],
-    get: (url, key) => getJSON(url, { Authorization: `Bearer ${key}` }, "Coverr"),
-    map: (v) => ({
-      site: "coverr",
-      id: String(v.id),
-      width: v.max_width || (v.is_vertical ? 1080 : 1920),
-      height: v.max_height || (v.is_vertical ? 1920 : 1080),
-      duration: v.duration,
-      title: v.title,
-      author: "",
-      page: "https://coverr.co",
-      thumb: v.thumbnail || v.poster,
-      ai: v.is_ai_generated === true,
-      text: [v.title, v.description, [].concat(v.tags || []).join(" ")],
-      files: [v.urls?.mp4_download || v.urls?.mp4].filter(Boolean).map((link) => ({ link, width: v.max_width || 1920, height: v.max_height || 1080 })),
-    }),
-    async search(q, key) {
-      const j = await this.get(`${api("coverr", "https://api.coverr.co")}/videos?query=${encodeURIComponent(q)}&page_size=20&urls=true`, key);
-      return (j.hits || []).map(this.map).filter((c) => !c.ai && !looksSynthetic(c.text));
-    },
-    async byId(id, key) {
-      return this.map(await this.get(`${api("coverr", "https://api.coverr.co")}/videos/${id}?urls=true`, key));
-    },
-    // Coverr asks apps to report each download.
-    async downloaded(id, key) {
-      await fetch(`${api("coverr", "https://api.coverr.co")}/videos/${id}/stats/downloads`, { method: "PATCH", headers: { Authorization: `Bearer ${key}` } }).catch(() => {});
-    },
-  },
   pixabay: {
     name: "Pixabay",
     env: ["PIXABAY_API_KEY", "PIXABAY_KEY"],
@@ -149,11 +125,16 @@ const SITES = {
 };
 
 export const stockKey = (site) => SITES[site]?.env.map((e) => process.env[e]).find(Boolean) || "";
-export const stockSites = (order = STOCK_SITES) => [].concat(order).filter((s) => SITES[s] && stockKey(s));
-const NO_KEY = "no stock footage key is set: add COVERR_API_KEY (free, instant at https://coverr.co/developers) to .env, or PIXABAY_API_KEY, or use src: files";
+export const stockSites = (order = DEFAULT_STOCK) => [].concat(order).filter((s) => SITES[s] && stockKey(s));
+const NO_KEY = "no stock site key is set (PEXELS_API_KEY; new Pexels keys are paused)";
 
-// Searches one site (results cached on disk for a day, which Pixabay requires and keeps
-// Coverr's 50 requests/hour free tier going further). Vertical clips first.
+// A Pexels search for a query, vertical clips first: where a person grabs a missing clip.
+export const pexelsSearchUrl = (q) => `https://www.pexels.com/search/videos/${encodeURIComponent(String(q).trim())}/?orientation=portrait`;
+// The file name a missing clip should be saved under so the library search finds it.
+export const neededName = (q) => `${slug(String(q).toLowerCase()).replace(/[.]+/g, "-") || "clip"}.mp4`;
+
+// Searches one site (results cached on disk for a day, which Pixabay requires and which
+// saves requests). Vertical clips first.
 async function searchSite(site, q, { ws, minDur = 2 }) {
   const file = path.join(stateDir(ws), "stock", "search", `${site}-${sha1(q.toLowerCase()).slice(0, 16)}.json`);
   const cached = readJSON(file);
@@ -168,7 +149,7 @@ async function searchSite(site, q, { ws, minDur = 2 }) {
 }
 
 // Candidates for a query from every site with a key (or the given ones), in order.
-export async function stockSearch(q, { ws = process.cwd(), sites, perSite = 8 } = {}) {
+export async function stockSearch(q, { ws = process.cwd(), sites = DEFAULT_STOCK, perSite = 8 } = {}) {
   const use = stockSites(sites);
   if (!use.length) throw new Error(NO_KEY);
   const out = [], errors = [];
@@ -182,6 +163,9 @@ export async function stockSearch(q, { ws = process.cwd(), sites, perSite = 8 } 
   if (!out.length && errors.length) throw new Error(errors.join("; "));
   return out;
 }
+
+// What to tell someone when no site with a key can supply a clip: where to look, what to save.
+export const manualHint = (q, saveDir) => `no stock key: get it from ${pexelsSearchUrl(q)} and save as ${path.join(saveDir, neededName(q))}`;
 
 export const formatStock = (c) => `${c.site} ${c.id} ${c.width}x${c.height} ${Math.round(c.duration * 10) / 10}s${c.title ? ` "${String(c.title).slice(0, 50)}"` : ""}${c.author ? ` by ${c.author}` : ""} → clip: ${c.site}:${c.id}`;
 
@@ -229,10 +213,11 @@ export async function stockFetch(c, { ws = process.cwd() } = {}) {
 //   "new floors"                       at that phrase, search for it
 //   { at, q: "floor tiles" }           library first, then the stock sites in `stock:` order
 //   { at, src: "broll/x.mp4" }         that file (a name that isn't a file is searched for)
-//   { at, clip: "coverr:S1YbPl1NfI" }  that exact stock clip
-//   { at, pexels: "floor tiles" }      one site only (also coverr:, pixabay:); a number = clip id
-// A clip isn't reused within a batch while another match exists. Returns the stock clips
-// used, for credits.
+//   { at, clip: "pexels:3571264" }     that exact stock clip
+//   { at, pexels: "floor tiles" }      one site only (also pixabay:); a number = clip id
+// A clip isn't reused within a batch while another match exists. A request nothing can fill
+// gets `missing` ({ q, search, file }) instead of failing the video. Returns the stock
+// clips used, for credits.
 export async function resolveBroll(videos, { ws = process.cwd(), onLog } = {}) {
   const used = new Set();
   const credits = new Map();
@@ -242,48 +227,53 @@ export async function resolveBroll(videos, { ws = process.cwd(), onLog } = {}) {
     const key = dirs.join("|");
     if (!libCache.has(key)) libCache.set(key, scanLibrary(dirs));
     const lib = libCache.get(key);
+    const saveDir = dirs[0] || path.join(v.base, "broll");
     v.broll = (v.broll || []).map((b) => (typeof b === "string" ? { at: b, q: b } : { ...b }));
     for (const b of v.broll) {
-      try {
-        if (b.src && fs.existsSync(path.resolve(v.base, b.src))) {
-          b.src = path.resolve(v.base, b.src);
-          used.add(b.src);
+      const only = STOCK_SITES.find((s) => b[s] !== undefined);
+      const q = only ? b[only] : b.q ?? b.find ?? b.src ?? (typeof b.at === "string" ? b.at : null);
+      if (b.src && fs.existsSync(path.resolve(v.base, b.src))) {
+        b.src = path.resolve(v.base, b.src);
+        used.add(b.src);
+        continue;
+      }
+      if (b.clip && (!SITES[String(b.clip).split(":")[0]] || !String(b.clip).split(":")[1])) {
+        b.error = `clip: write it as site:id, e.g. pexels:3571264 (sites: ${STOCK_SITES.join(", ")})`;
+        continue;
+      }
+      if (q == null && !b.clip) {
+        b.error = "needs src, q, clip or a stock site";
+        continue;
+      }
+      if (!only && !b.clip) {
+        const hit = searchLibrary(lib, String(q), used);
+        if (hit) {
+          b.src = hit.file;
+          used.add(hit.file);
+          b.found = `library:${hit.name}`;
           continue;
         }
-        const only = STOCK_SITES.find((s) => b[s] !== undefined);
+      }
+      try {
         let pick;
         if (b.clip) {
           const [site, id] = String(b.clip).split(":");
-          if (!SITES[site] || !id) throw new Error(`clip: write it as site:id, e.g. coverr:S1YbPl1NfI`);
           pick = { site, id };
-        } else {
-          const q = only ? b[only] : b.q ?? b.find ?? b.src ?? (typeof b.at === "string" ? b.at : null);
-          if (q == null) throw new Error("needs src, q, clip or a stock site");
-          if (!only) {
-            const hit = searchLibrary(lib, String(q), used);
-            if (hit) {
-              b.src = hit.file;
-              used.add(hit.file);
-              b.found = `library:${hit.name}`;
-              continue;
+        } else if (only && /^\d+$/.test(String(q))) pick = { site: only, id: String(q) };
+        else {
+          const sites = stockSites(only ? [only] : v.stock ?? DEFAULT_STOCK);
+          if (!sites.length) throw new Error(NO_KEY);
+          const errors = [];
+          for (const s of sites) {
+            try {
+              const list = await searchSite(s, String(q), { ws, minDur: Number(b.dur) || 2 });
+              pick = list.find((c) => !used.has(`${c.site}:${c.id}`)) || list[0];
+            } catch (e) {
+              errors.push(e.message);
             }
+            if (pick) break;
           }
-          if (only && /^\d+$/.test(String(q))) pick = { site: only, id: String(q) };
-          else {
-            const sites = stockSites(only ? [only] : v.stock ?? STOCK_SITES);
-            if (!sites.length) throw new Error(only ? `${SITES[only].name} needs ${SITES[only].env[0]} in .env` : `no match in the B-roll library, and ${NO_KEY}`);
-            const errors = [];
-            for (const s of sites) {
-              try {
-                const list = await searchSite(s, String(q), { ws, minDur: Number(b.dur) || 2 });
-                pick = list.find((c) => !used.has(`${c.site}:${c.id}`)) || list[0];
-              } catch (e) {
-                errors.push(e.message);
-              }
-              if (pick) break;
-            }
-            if (!pick) throw new Error(errors.length ? errors.join("; ") : `no stock footage for "${q}" on ${sites.join(", ")} (try other words)`);
-          }
+          if (!pick) throw new Error(errors.length ? errors.join("; ") : `nothing on ${sites.join(", ")} for "${q}"`);
         }
         const got = await stockFetch(pick, { ws });
         used.add(`${got.site}:${got.id}`);
@@ -291,13 +281,41 @@ export async function resolveBroll(videos, { ws = process.cwd(), onLog } = {}) {
         b.found = `${got.site}:${got.id}`;
         b.credit = got;
         credits.set(b.found, got);
-        onLog?.(`b-roll "${b.clip || b.q || b.at}" → ${SITES[got.site].name} ${got.id}${got.author ? ` by ${got.author}` : ""}`);
+        onLog?.(`b-roll "${b.clip || q}" → ${SITES[got.site].name} ${got.id}${got.author ? ` by ${got.author}` : ""}`);
       } catch (e) {
-        b.error = e.message;
+        const term = String(q ?? b.at ?? b.clip);
+        b.missing = { q: term, reason: e.message, search: pexelsSearchUrl(term), file: path.join(saveDir, neededName(term)) };
       }
     }
   }
   return [...credits.values()];
+}
+
+// Writes (or clears) the "B-roll needed" list for a batch: a Markdown file for people and
+// a JSON twin the dashboard uses to drop downloaded clips straight into place.
+export function writeNeeded({ dir, batchName, needs, rerun }) {
+  const stem = batchName ? `${batchName.replace(/\.[^.]+$/, "")}-` : "";
+  const md = path.join(dir, `${stem}broll-needed.md`);
+  const json = path.join(dir, `${stem}broll-needed.json`);
+  if (!needs.length) {
+    for (const f of [md, json]) fs.rmSync(f, { force: true });
+    return null;
+  }
+  const lines = [
+    `# B-roll needed${batchName ? `: ${batchName}` : ""}`,
+    "",
+    "Nothing in the B-roll library matched these. Download each from Pexels (pick a vertical",
+    "clip if there is one; nothing AI-made), save it with the file name shown, then re-render:",
+    "",
+    `    ${rerun}`,
+    "",
+    "Or open the reel dashboard (reel serve), B-roll tab, and drop each download on its row.",
+    "",
+  ];
+  for (const n of needs) lines.push(`- [ ] **${n.video}** at "${n.at}": ${n.q}`, `  ${n.search}`, `  save as: \`${n.file}\``, "");
+  fs.writeFileSync(md, lines.join("\n"));
+  writeJSON(json, { batch: batchName || null, rerun, needs });
+  return md;
 }
 
 // Compact listing of a library for agents: name, length, size, tags.

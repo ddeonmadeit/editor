@@ -14,7 +14,7 @@ videos:
   - src: raw/IMG_1201.MOV
     hook: "I lost $50K on my first motel deal 💸"   # first 4 s, rendered by hook-gen
     drop: [2]                                      # transcript lines to cut (retakes)
-    broll: ["new floors", "the bank"]              # your B-roll folder first, then stock footage
+    broll: ["new floors", "the bank"]              # from your B-roll folder; missing clips get a Pexels list
   - src: raw/IMG_1202.MOV
     hook: "This motel in Parkes is double my age! 🏨👴"
 ```
@@ -38,12 +38,12 @@ $ reel render edit.yaml
 - **Punch-ins** on alternate cuts to hide jumps; HDR iPhone footage tone-mapped to SDR.
 - **Captions** in the reference looks: white bold-italic with soft shadow, orange with a dark
   edge, condensed green caps, TikTok native, karaoke; pop-in, highlighted words.
-- **B-roll** by phrase: your library folders first (file names, folders, `tags.yaml`), then
-  stock sites with real filmed footage, whichever you have a key for:
-  [Coverr](https://coverr.co/developers), [Pexels](https://www.pexels.com/api/),
-  [Pixabay](https://pixabay.com/api/docs/). Vertical first, AI-generated/3D/animated clips
-  left out, no reuse within a batch, credits written to `out/credits.txt`. Full-screen or
-  split-screen; stills get a slow push-in.
+- **B-roll** by phrase from your library folders (file names, folders, `tags.yaml`), no reuse
+  within a batch. A clip the library doesn't have doesn't stop the render: it goes on a
+  "B-roll needed" list with a Pexels search link (vertical clips) and the file name to save
+  it as; drop the download in (or onto its row in the dashboard) and re-render. With a
+  Pexels API key the gaps fill automatically. Full-screen or split-screen; stills get a slow
+  push-in.
 - **Callouts**: counting money tickers (`-$50,000` ticking up like the reference), colour
   flashes, music with ducking, sound effects.
 - **Audio**: high-pass, gentle compression, presence lift, two-pass loudness to -14 LUFS.
@@ -65,16 +65,18 @@ reel skill          # optional: teach Claude Code the workflow in every folder
 ```
 
 macOS: `brew install ffmpeg python`. Ubuntu: `apt install ffmpeg python3-venv`.
-For stock B-roll put a key in `.env` (in the project folder or the repo):
+### B-roll that isn't in your library
 
-| site | key | notes |
-|---|---|---|
-| Coverr | `COVERR_API_KEY` | free and instant at <https://coverr.co/developers>; marks AI-generated clips, which reel leaves out. 50 searches/hour on the free plan |
-| Pexels | `PEXELS_API_KEY` | new keys are paused by Pexels (Oct 2026); an existing key works |
-| Pixabay | `PIXABAY_API_KEY` | free and instant at <https://pixabay.com/api/docs/>; accepts AI uploads and can't filter them, so reel only screens titles/tags. Use as a backup |
+No key needed. reel lists what's missing in `<batch>-broll-needed.md` (and in the
+dashboard's B-roll tab) with a Pexels search link and the file name to save each clip as.
+Someone grabs those few clips from Pexels and drops them in; the next render uses them.
+reel never downloads from the Pexels website itself: Pexels' terms forbid automated
+downloading, and new API keys are paused.
 
-With several keys, sites are tried in the order of `stock:` (default `[pexels, coverr, pixabay]`).
-Searches are cached for a day.
+If you have a Pexels API key, put `PEXELS_API_KEY=...` in `.env` (project folder or the
+repo) and gaps fill automatically. Pixabay (`PIXABAY_API_KEY`, free) is supported but off
+unless a batch sets `stock: [pexels, pixabay]`, because Pixabay accepts AI-generated uploads
+and its API can't filter them out.
 
 ## Use it with Claude Code
 
@@ -132,7 +134,7 @@ reel ingest raw/*.mov            transcribe only (--model, --lang, --prompt "nam
 reel transcript <id>             numbered transcript
 reel check out/                  1080x1920, 60 fps, audio, -14 LUFS
 reel sheet out/x.mp4             contact sheet PNG (--at 1,5,9)
-reel broll "query"               library + stock candidates (--sheet)
+reel broll "query"               library match, else a Pexels link + file name
 reel library [broll/]            list the B-roll folder (--sheet)
 reel hook "text" -o hook.png     one hook via hook-gen (--preset get-known)
 reel styles                      looks, caption styles, hook presets
@@ -159,7 +161,7 @@ still for previews.
 `src/transcribe.js` + `py/transcribe.py` (faster-whisper, VAD-split) → `src/transcript.js`
 (numbered lines, retakes, phrase lookup) → `src/edl.js` (what survives, frame-aligned) →
 `src/captions.js` (ASS subtitles) + `src/hooks.js` (hook-gen in headless Chromium) +
-`src/broll.js` (library, stock sites) → `src/render.js` (one ffmpeg filter graph per video:
+`src/broll.js` (library, needed list, optional stock APIs) → `src/render.js` (one ffmpeg filter graph per video:
 trim/crop/scale each kept segment once, overlays, libass, loudness, x264/VideoToolbox) →
 `src/batch.js` (plans and renders a batch in parallel). `src/server.js` and `src/mcp.js` are
 thin layers over the same functions.
@@ -168,7 +170,6 @@ thin layers over the same functions.
 
 Code: MIT. Caption fonts in `fonts/` are static cuts of Arimo, Inter, Montserrat, TikTok
 Sans, Anton and Bebas Neue under the SIL Open Font License (see `fonts/LICENSES.md`).
-Hooks: [hook-gen](https://github.com/ddeonmadeit/hook-gen) (git submodule). Stock B-roll is
-under each site's licence ([Coverr](https://coverr.co/license),
-[Pexels](https://www.pexels.com/license/), [Pixabay](https://pixabay.com/service/license-summary/));
-`out/credits.txt` lists what was used.
+Hooks: [hook-gen](https://github.com/ddeonmadeit/hook-gen) (git submodule). Pexels clips are
+under the [Pexels license](https://www.pexels.com/license/) (free to use, no attribution
+required); clips fetched through an API key are listed in `out/credits.txt`.

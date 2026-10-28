@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import YAML from "yaml";
-import { resolveBroll } from "./broll.js";
+import { resolveBroll, writeNeeded } from "./broll.js";
 import { assFile, captionEvents, chunkWords, textEvents } from "./captions.js";
 import { buildEdit } from "./edl.js";
 import { HOOKGEN_FONT_PX, renderHooks } from "./hooks.js";
@@ -11,7 +11,7 @@ import { renderPlan } from "./render.js";
 import { CAPTION_STYLES, POSITIONS, captionStyle } from "./styles.js";
 import { applyFixes, buildLines, closest, findPhrase } from "./transcript.js";
 import { ingest, loadTranscript, wordsOf } from "./transcribe.js";
-import { H, IMAGE_EXT, ROOT, W, ensureDir, expandVideos, fmtDur, pngSize, pool, renderSlot, round, stateDir } from "./util.js";
+import { H, IMAGE_EXT, ROOT, W, ensureDir, expandVideos, fmtDur, pngSize, pool, readJSON, renderSlot, round, stateDir } from "./util.js";
 
 // Every setting a video can have, with its default. A batch's `use:` looks, its
 // `defaults:` and each video's own keys are merged over these, in that order.
@@ -30,7 +30,7 @@ export const DEFAULTS = {
   fix: {}, // caption spelling: { parks: Parkes, "Travel Pinot": Travelpreneur }
   broll: [], // clips over the speaker: "phrase" | { at, q | src | pexels, dur, layout }
   library: ["broll"], // your B-roll folders, searched before stock sites
-  stock: ["pexels", "coverr", "pixabay"], // stock sites to try, in order (those with a key)
+  stock: ["pexels"], // stock sites to try when the library has nothing (needs a key); pixabay is opt-in
   texts: [],
   flash: [],
   sfx: [],
@@ -89,10 +89,10 @@ function lev(a, b) {
 // Reads a batch (YAML/JSON file path, YAML text, or object) into one settings object per
 // video. Paths in the batch are relative to the batch file.
 export function loadBatch(input, { ws = process.cwd() } = {}) {
-  let spec, base = ws;
+  let spec, base = ws, file = null;
   if (isObj(input)) spec = input;
   else if (typeof input === "string" && !input.includes("\n") && fs.existsSync(path.resolve(ws, input))) {
-    const file = path.resolve(ws, input);
+    file = path.resolve(ws, input);
     base = path.dirname(file);
     spec = YAML.parse(fs.readFileSync(file, "utf8"));
   } else spec = YAML.parse(String(input));
@@ -132,7 +132,7 @@ export function loadBatch(input, { ws = process.cwd() } = {}) {
       videos.push(v);
     }
   });
-  return { videos, outDir, jobs: spec.jobs, warnings, base };
+  return { videos, outDir, jobs: spec.jobs, warnings, base, file };
 }
 
 // Resolves `at:` (seconds, a phrase, or { line: n }) to an output time window.
@@ -226,9 +226,14 @@ export async function planVideo(v, { ws, outDir, hookFiles }) {
     }
   };
 
-  // B-roll (files already resolved from the library or Pexels by resolveBroll)
+  // B-roll (files already resolved from the library or a stock site by resolveBroll). A clip
+  // nobody has supplied yet is left out with a note, so the rest of the video still renders.
   for (const [k, b] of (v.broll || []).entries()) {
     const label = `broll[${k}]`;
+    if (b.missing) {
+      warnings.push(`no B-roll yet for "${b.missing.q}"${b.missing.list ? ` (listed in ${b.missing.list})` : ""}`);
+      continue;
+    }
     if (b.error || !b.src || !fs.existsSync(b.src)) {
       errors.push(`${label}${typeof b.at === "string" ? ` "${b.at}"` : ""}: ${b.error || `file not found: ${b.src}`}`);
       continue;
@@ -333,6 +338,7 @@ export async function planBatch(input, { ws = process.cwd(), only, onLog, render
     await ingest([...new Set(missing)], { ws, onLog });
   }
   const credits = await resolveBroll(videos, { ws, onLog });
+  const needed = listNeeded(b, videos, ws, only);
   const hookFiles = new Map();
   const hooks = [];
   for (const v of videos) if (v.hook && v.hook.text && !v.hook.png && !hookFiles.has(hookKey(v.hook))) {
@@ -358,11 +364,30 @@ export async function planBatch(input, { ws = process.cwd(), only, onLog, render
     if (seen.has(p.out)) p.errors.push(`output ${path.basename(p.out)} is also written by ${seen.get(p.out)}; give one a name:`);
     seen.set(p.out, p.id);
   }
-  return { plans, warnings: b.warnings, jobs: b.jobs, outDir: b.outDir, credits };
+  return { plans, warnings: b.warnings, jobs: b.jobs, outDir: b.outDir, credits, needed };
+}
+
+// Collects B-roll nothing could fill into the batch's "B-roll needed" list. With --only,
+// other videos' entries from the last full run are kept.
+function listNeeded(b, videos, ws, only) {
+  const batchName = b.file ? path.basename(b.file) : null;
+  const idOf = (v) => v.name || loadTranscript(ws, v.src)?.id || path.basename(v.src);
+  const ran = new Set(videos.map(idOf));
+  const stem = batchName ? `${batchName.replace(/\.[^.]+$/, "")}-` : "";
+  const prev = only?.length ? readJSON(path.join(b.base, `${stem}broll-needed.json`), { needs: [] }).needs.filter((n) => !ran.has(n.video)) : [];
+  const fresh = [];
+  for (const v of videos) for (const x of v.broll || []) if (x.missing) fresh.push({ video: idOf(v), at: typeof x.at === "string" ? x.at : String(x.at ?? ""), ...x.missing });
+  const needs = [...prev, ...fresh];
+  const batchArg = b.file ? path.relative(ws, b.file) || batchName : "<batch>";
+  const ids = [...new Set(needs.map((n) => n.video))];
+  const file = writeNeeded({ dir: b.base, batchName, needs, rerun: `reel render ${batchArg} --only ${ids.join(",")}` });
+  const rel = file && path.relative(ws, file);
+  for (const v of videos) for (const x of v.broll || []) if (x.missing) x.missing.list = rel;
+  return file ? { count: needs.length, file: rel } : null;
 }
 
 // Stock sites ask for credit where possible: one line per clip used, per video.
-const SITE_NAMES = { pexels: "Pexels", coverr: "Coverr", pixabay: "Pixabay" };
+const SITE_NAMES = { pexels: "Pexels", pixabay: "Pixabay" };
 function writeCredits(outDir, plans) {
   const lines = [];
   for (const p of plans)
@@ -377,7 +402,7 @@ function writeCredits(outDir, plans) {
 // Plans and renders a batch, several videos at a time.
 export async function renderBatch(input, { ws = process.cwd(), only, jobs, quality, encoder, onLog, onProgress, onDone } = {}) {
   const t0 = Date.now();
-  const { plans, warnings, jobs: specJobs, outDir } = await planBatch(input, { ws, only, onLog });
+  const { plans, warnings, jobs: specJobs, outDir, needed } = await planBatch(input, { ws, only, onLog });
   writeCredits(outDir, plans);
   const ok = plans.filter((p) => !p.errors.length);
   for (const p of ok) {
@@ -406,7 +431,7 @@ export async function renderBatch(input, { ws = process.cwd(), only, jobs, quali
     }
   });
   if (!process.env.REEL_KEEP_TMP) fs.rmSync(tmpRoot, { recursive: true, force: true });
-  return { results, warnings, secs: (Date.now() - t0) / 1000 };
+  return { results, warnings, secs: (Date.now() - t0) / 1000, needed };
 }
 
 // One line per planned video, for `reel plan` and the API.

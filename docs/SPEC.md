@@ -96,40 +96,45 @@ Put client-wide names under `defaults:` or in the client's look file.
 
 ## B-roll
 
-Ask for B-roll by what it should show. Your library folders are searched first (file
-names, folder names, and an optional `tags.yaml` per folder), then stock sites with real
-filmed footage (Coverr, Pexels, Pixabay: whichever have a key), vertical first, with
-AI-generated, 3D and animated clips left out. A clip isn't reused within a batch while
-another match exists. Stock clips used are listed in `out/credits.txt`.
+Ask for B-roll by what it should show. Your library folders are searched (file names,
+folder names, and an optional `tags.yaml` per folder). A clip isn't reused within a batch
+while another match exists.
+
+When nothing matches, the video still renders without that clip, and the clip goes on
+`<batch>-broll-needed.md` (next to the batch) with a Pexels search link for vertical
+clips and the exact file name to save it as in the library. Once it's saved there (or
+dropped onto its row in the dashboard's B-roll tab), `reel render <batch> --only <id>` puts
+it in. reel never downloads from the Pexels website itself (Pexels' terms forbid it).
+
+With an API key, gaps are filled automatically instead: `PEXELS_API_KEY` (new keys are
+paused by Pexels, existing ones work). `PIXABAY_API_KEY` works too but only for batches
+that set `stock: [pexels, pixabay]`: Pixabay accepts AI-generated uploads and its API can't
+filter them, so only titles and tags are screened. Clips fetched by API are listed in
+`out/credits.txt`; searches are cached for a day.
 
 ```yaml
 broll:
   - "new floors"                                   # at that phrase, search for it
   - { at: "new aircon", q: "air conditioner unit" } # at a phrase, search for something else
   - { at: "the banker", src: broll/bank.mp4 }       # a specific file
-  - { at: "Friday", clip: "coverr:S1YbPl1NfI" }     # an exact stock clip (ids from `reel broll`)
-  - { at: "Friday", coverr: "city traffic night" }  # one site only (also pexels:, pixabay:)
+  - { at: "Friday", clip: "pexels:3571264" }        # an exact stock clip (needs that site's key)
   - { at: 12.5, src: broll/sign.jpg, dur: 1.5 }     # at output second 12.5; stills get a slow push-in
   - { at: "my documentary", to: "business", q: "film camera", layout: split }
 library: [broll, ~/Footage/motel]                  # where to look first (default: broll/)
-stock: [coverr, pixabay]                           # stock sites to try, in order (default: pexels, coverr, pixabay)
+stock: [pexels]                                    # API sites to try when a key is set (default: pexels)
 ```
 
 | key | meaning |
 |---|---|
 | `at` | a phrase (first match in the edited video), output seconds, or `{line: n}` |
 | `to` | phrase or seconds where it ends; otherwise `dur` (default: the phrase + 0.4 s, at least 2 s) |
-| `q` / `src` / `clip` / `coverr` / `pexels` / `pixabay` | what to show (see above) |
+| `q` / `src` / `clip` | what to show (see above) |
 | `from` | start this many seconds into the clip |
 | `layout` | `full` (default) or `split` (speaker top half, B-roll bottom half) |
 | `audio` | B-roll sound volume, 0..1 (default 0, muted) |
 | `fit` | `cover` (default) or `blur` |
 
-Stock sites need a key in the environment or a `.env` file: `COVERR_API_KEY` (free and
-instant at coverr.co/developers; it marks AI-generated clips, which are left out),
-`PEXELS_API_KEY` (new keys are paused by Pexels), `PIXABAY_API_KEY` (free and instant; it
-can't filter AI uploads, so only titles/tags are screened: use it as a backup). Searches
-are cached for a day.
+`tags.yaml` example: `IMG_2034.MOV: new floor tiles being laid in a motel room`.
 `tags.yaml` example: `IMG_2034.MOV: new floor tiles being laid in a motel room`.
 
 ## Text callouts, flashes, sound

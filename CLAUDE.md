@@ -13,7 +13,7 @@ changing reel itself.
 - `src/transcript.js` numbered lines, retake flags, phrase search. `src/edl.js` kept segments (frame-aligned).
 - `src/captions.js` ASS subtitles; `src/styles.js` caption/text looks; `presets/*.yaml` looks.
 - `src/hooks.js` drives hook-gen (`vendor/hook-gen`, git submodule) in headless Chromium and captures its PNG export.
-- `src/broll.js` library search + stock sites (Coverr, Pexels, Pixabay). `src/render.js` the ffmpeg filter graph. `src/qa.js` check + contact sheets.
+- `src/broll.js` library search, the "B-roll needed" list (Pexels links), optional Pexels/Pixabay APIs. Never automate downloads from the Pexels website (their terms forbid it). `src/render.js` the ffmpeg filter graph. `src/qa.js` check + contact sheets.
 - `fonts/` static caption fonts (rebuild with `scripts/build-fonts.py`); libass picks them by family name.
 
 ## Rules
