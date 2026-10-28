@@ -1,0 +1,31 @@
+# Example batch. Paths are relative to this file.
+use: white                     # white | orange | green | getknown
+out: out
+defaults:
+  pacing: normal               # tight | normal | loose | off
+  library: [broll]             # searched before Pexels
+videos:
+  - src: raw/IMG_1201.MOV
+    hook: "I lost $50K on my first motel deal 💸"
+    drop: [2]                  # line 2 was a fumbled take
+    highlight: ["$50,000"]
+    texts:
+      - { at: 0, text: "-$50,000", style: red, count: 1, dur: 3.5 }
+    flash:
+      - { at: "shitty lawyer" }
+    broll:
+      - { at: "the banker", q: "bank building" }
+
+  - src: raw/IMG_1202.MOV
+    hook: "This motel in Parkes is\ndouble my age! 🏨👴"
+    broll:
+      - "new floors"
+      - { at: "new aircon", q: "air conditioner unit outside" }
+      - { at: "best motel", src: broll/sign.jpg, dur: 1.5 }
+
+  - src: raw/IMG_1203.MOV
+    use: orange
+    hook: { text: "Being a master of one thing is\nholding you back! 🙈", preset: get-known }
+    retakes: auto
+    broll:
+      - { at: "content creator", q: "filming with camera", layout: split, dur: 2.5 }

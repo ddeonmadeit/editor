@@ -1,0 +1,32 @@
+{
+  "name": "reel-editor",
+  "version": "0.1.0",
+  "description": "Open-source batch video editor built for Claude and other AI agents: 1080x1920 60fps talking-head edits with hooks, captions, jump cuts and B-roll from one small YAML file.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "reel": "bin/reel.js"
+  },
+  "scripts": {
+    "start": "node bin/reel.js serve",
+    "test": "node --test test/*.test.js",
+    "mcp": "node bin/reel.js mcp"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "playwright-core": "1.63.0",
+    "yaml": "^2.6.0"
+  },
+  "files": [
+    "bin",
+    "src",
+    "py",
+    "web",
+    "fonts",
+    "presets",
+    "docs",
+    "llms.txt"
+  ]
+}

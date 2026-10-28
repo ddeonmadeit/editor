@@ -1,0 +1,8 @@
+# Get Known brand hook (Montserrat ExtraBold, ink boxes, gold payoff line) over the
+# white caption look.
+captions:
+  style: white
+hook:
+  preset: get-known
+pacing: normal
+zoom: 1.1

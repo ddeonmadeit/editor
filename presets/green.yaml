@@ -1,0 +1,9 @@
+# Condensed all-caps captions (Anton), mint fill with a green stroke, 1-2 words at a time.
+# Matches the "Australia's best boxer tries our drinks" edit. Street/vlog footage keeps
+# more natural pauses, so cuts are looser and there's no punch-in.
+captions:
+  style: green
+hook:
+  preset: tiktok-classic
+pacing: loose
+zoom: 1

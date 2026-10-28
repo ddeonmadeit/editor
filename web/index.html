@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reel Editor</title>
+  <link rel="icon" href="/hook-gen/favicon.svg">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="logo">▶</span> Reel <small>batch editor for agents · 1080×1920 · 60 fps</small></div>
+    <nav id="tabs" role="tablist">
+      <button data-tab="edit" aria-selected="true">Edit</button>
+      <button data-tab="videos">Videos</button>
+      <button data-tab="broll">B-roll</button>
+      <button data-tab="hooks">Hooks</button>
+      <button data-tab="agents">Agents</button>
+    </nav>
+    <div id="status" class="chips"></div>
+  </header>
+
+  <main>
+    <section id="tab-edit" class="tab grid2">
+      <div class="panel">
+        <div class="row">
+          <h2>Batch</h2>
+          <select id="batchPick" aria-label="Batch file"></select>
+          <button id="reloadFiles" class="ghost" title="Refresh file list">↻</button>
+        </div>
+        <textarea id="batchText" spellcheck="false" placeholder="use: white&#10;videos:&#10;  - src: raw/IMG_0001.MOV&#10;    hook: &quot;I lost $50K on my first motel deal 💸&quot;&#10;    drop: [3]"></textarea>
+        <div class="row actions">
+          <button id="save">Save</button>
+          <button id="plan" class="ghost">Check</button>
+          <span class="grow"></span>
+          <button id="renderDraft" class="ghost">Render draft</button>
+          <button id="render" class="primary">Render</button>
+        </div>
+        <pre id="planOut" class="out" hidden></pre>
+        <details class="newbatch">
+          <summary>New batch from videos</summary>
+          <form id="newForm" class="row wrap">
+            <input id="newFile" value="edit.yaml" aria-label="Batch file name">
+            <input id="newVideos" placeholder="raw/*.mov" aria-label="Videos (globs, space separated)" class="grow">
+            <select id="newLook" aria-label="Look"></select>
+            <button>Transcribe + create</button>
+          </form>
+          <p class="hint">Transcribes the videos and writes the batch with every transcript inline, retakes pre-filled in <code>drop</code>. Upload footage by dropping files on this page.</p>
+        </details>
+      </div>
+      <div class="panel">
+        <div class="row"><h2>Jobs</h2></div>
+        <div id="jobs" class="jobs"><p class="hint">No jobs yet. Render a batch, or let an agent run <code>reel render edit.yaml</code>.</p></div>
+      </div>
+    </section>
+
+    <section id="tab-videos" class="tab grid2" hidden>
+      <div class="panel">
+        <h2>Transcribed videos</h2>
+        <ul id="videoList" class="list"></ul>
+      </div>
+      <div class="panel">
+        <h2 id="trTitle">Transcript</h2>
+        <pre id="trText" class="out tall">Pick a video.</pre>
+      </div>
+    </section>
+
+    <section id="tab-broll" class="tab" hidden>
+      <div class="panel">
+        <form id="brollForm" class="row">
+          <h2>Find B-roll</h2>
+          <input id="brollQ" class="grow" placeholder="e.g. air conditioner unit, motel sign at night" aria-label="What you need">
+          <button class="primary">Search</button>
+        </form>
+        <p class="hint">Your <code>broll/</code> folder is searched first (file names, folder names, <code>tags.yaml</code>), then Pexels (real footage, vertical first). Click a clip to copy its batch line.</p>
+        <div id="brollOut"></div>
+      </div>
+    </section>
+
+    <section id="tab-hooks" class="tab" hidden>
+      <iframe id="hookgen" title="hook-gen" src="about:blank"></iframe>
+    </section>
+
+    <section id="tab-agents" class="tab" hidden>
+      <div class="panel prose">
+        <h2>Connect an agent</h2>
+        <p><b>Claude Code</b> (best, fewest tokens): run it in your project folder. The repo ships a skill, so just ask "edit the videos in raw/".</p>
+        <pre class="out">reel new edit.yaml raw/*.mov     # transcribe, transcripts inline
+# agent fills hook + drop (+ broll) in edit.yaml
+reel render edit.yaml            # all videos in parallel
+reel check out/                  # 1080x1920, 60 fps, -14 LUFS</pre>
+        <p><b>Claude Desktop / any MCP client</b>: add this server.</p>
+        <pre class="out" id="mcpCfg"></pre>
+        <p><b>HTTP</b>: <code>POST /api/render {"batch": "edit.yaml"}</code>, then <code>GET /api/job?id=1&amp;wait=1</code>. Compact reference for models: <a href="/llms.txt">/llms.txt</a> · full spec: <a href="/docs/spec">/docs/spec</a>.</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="drop" hidden>Drop videos to upload into <code>uploads/</code></div>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+# Orange bold-italic captions with a dark edge, a little below centre.
+# Matches the "Being a master of one thing is holding you back" edit.
+captions:
+  style: orange
+hook:
+  preset: tiktok-classic
+pacing: normal
+zoom: 1.08

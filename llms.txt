@@ -1,0 +1,40 @@
+# reel: batch video editor for AI agents
+
+> Turns raw talking-head clips into finished 1080x1920 60fps shorts: hook (first 4 s, made by hook-gen), word-by-word captions, jump cuts, retake removal, punch-ins, B-roll (your folder, then Pexels), -14 LUFS audio. You describe the edit in a small YAML file; reel does the video work, many videos in parallel.
+
+## Workflow (CLI)
+1. `reel new edit.yaml raw/` transcribes and writes edit.yaml with transcripts inline (`n start text`, `R>n` = likely retake, pre-filled in drop).
+2. Edit edit.yaml: per video set `hook`, `drop` (line numbers), optional `broll` (phrases).
+3. `reel render edit.yaml` renders all videos; `reel check out/` verifies format.
+
+## Batch example
+```yaml
+use: white                       # look: white | orange | green | getknown
+videos:
+  - src: raw/IMG_1201.MOV
+    hook: "I lost $50K on my first motel deal 💸"
+    drop: [2, 7-9]
+    broll: ["new floors", { at: "the bank", q: "bank exterior" }]
+    highlight: ["$50,000"]
+    texts: [{ at: 0, text: "-$50,000", style: red, count: 1, dur: 3.5 }]
+```
+
+## Keys (per video, or under `defaults:`)
+- src (file/glob), name, use (look), drop [3, 5-7], keep, cut ["phrase", {from,to}], retakes: auto, fillers, pacing tight|normal|loose|off, trim [s,e], speed
+- hook: "text" | {text, preset: tiktok-classic|get-known, style{...hook-gen}, dur 4, y 0.5, size 84, png}
+- captions: white|orange|green|tiktok|bold|false | {style, size, y, words, chars, case, active, shadow, pop}; highlight [words]
+- broll: ["phrase"] | {at: phrase|seconds|{line}, to, dur, q|src|pexels: query|id, from, layout full|split, audio}; library [dirs] (default broll/)
+- texts [{at, text, style red|white|yellow|green, y top|center|bottom, count, dur}], flash [{at, color, dur}], music {src, volume, duck}, sfx [{at, src}]
+- zoom 1.1, focus 0.35, fit cover|blur, grade punchy|warm|cool|film|bw|file.cube, audio {loudness -14, enhance, denoise}, quality draft|high|max, encoder auto|x264|videotoolbox|nvenc
+
+## Other commands
+- `reel plan edit.yaml` check without rendering · `reel transcript <id>` · `reel sheet out/x.mp4` one contact-sheet image
+- `reel broll "query"` library + Pexels candidates · `reel library` list B-roll folder · `reel hook "text"` one hook PNG
+- `reel serve` website + HTTP API (port 4317) · `reel mcp` MCP server (stdio)
+
+## HTTP API
+- POST /api/new {batch, files[], use} · POST /api/plan {batch} · POST /api/render {batch, only[], quality} → job
+- GET /api/job?id=N&wait=1 · GET /api/transcript?id=X · GET /api/broll?q=... · POST /api/upload?name=f.mp4 (raw body)
+- GET /api/events (SSE progress) · outputs at /files/out/<id>.mp4 · Bearer REEL_TOKEN if set
+
+Full reference: /docs/spec (docs/SPEC.md).

@@ -1,0 +1,9 @@
+# White bold-italic captions with a soft drop shadow, mid-frame, 1-3 words at a time.
+# TikTok-classic hook box for the first 4 seconds. Punch-in on every other cut.
+# Matches the "double my age" / "I lost 50K on my first motel deal" edits.
+captions:
+  style: white
+hook:
+  preset: tiktok-classic
+pacing: normal
+zoom: 1.1
