@@ -23,9 +23,9 @@ watch videos, extract frames, or write ffmpeg commands yourself: that is what bu
      off-topic bits, "is it recording?". Check the pre-filled retakes; remove any wrong one.
    - `broll:` 0-4 moments that benefit from cutaways, as the phrase where it should start:
      `broll: ["new floors", { at: "the bank", q: "bank building exterior" }]`. The user's
-     `broll/` folder is searched; clips it doesn't have are listed in
-     `<batch>-broll-needed.md` with Pexels links for a person to fetch (the video still
-     renders without them). Never download from Pexels yourself. Don't add B-roll over
+     `broll/` folder is searched first, then Pixabay (real footage, AI clips left out).
+     Describe the scene for `q` ("worker laying floor tiles"); if nothing matches well the
+     video renders without it and the note says so: rephrase. Don't add B-roll over
      the hook or over emotional face-to-camera moments.
    - Optional: `highlight: ["$50,000"]`, `texts:` callouts, a different `use:` look.
    - Names the transcript got wrong: `fix: { parks: Parkes }` (captions only; put
@@ -77,4 +77,4 @@ Everything else: `reel help spec`. B-roll candidates for a phrase: `reel broll "
 If `reel` isn't on PATH, run it as `node <editor repo>/bin/reel.js` (or `npm link` once in
 the repo).
 `reel setup` installs/checks ffmpeg, faster-whisper, the hook renderer and hook-gen.
-An existing `PEXELS_API_KEY` in the environment or `.env` lets reel fill B-roll gaps itself.
+Pixabay B-roll needs `PIXABAY_API_KEY` in the environment or `.env` (free at pixabay.com/api/docs).

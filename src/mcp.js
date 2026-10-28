@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { describeLibrary, formatStock, manualHint, scanLibrary, searchLibrary, stockSearch, stockSites } from "./broll.js";
+import { NO_KEY, describeLibrary, formatStock, scanLibrary, searchLibrary, stockSearch, stockSites } from "./broll.js";
 import { Jobs } from "./jobs.js";
 import { check, formatCheck, sheet } from "./qa.js";
 import { buildLines, formatTranscript } from "./transcript.js";
@@ -43,7 +43,7 @@ const TOOLS = [
   },
   {
     name: "reel_broll",
-    description: "Find B-roll for a phrase: your library folder first, then stock sites with a key (Pexels; Pixabay if enabled). Without a key it returns a Pexels search link and the file name to save the clip under.",
+    description: "Find B-roll for a phrase: your library folder first, then Pixabay (real footage, vertical first, AI clips left out). Returns clip ids to pin with broll: [{ at, clip: \"pixabay:<id>\" }].",
     inputSchema: { type: "object", properties: { q: { type: "string" }, library: { type: "string", description: "library folder (default broll)" } }, required: ["q"] },
   },
   {
@@ -106,7 +106,7 @@ export async function startMcp({ ws = process.cwd() } = {}) {
     async reel_broll({ q, library }) {
       const hit = searchLibrary(scanLibrary([abs(library || "broll")]), q);
       const lines = [hit ? `library: ${path.relative(ws, hit.file)} (${Math.round(hit.score * 100)}%)` : "library: no match"];
-      if (!stockSites().length) return text([...lines, ...(hit ? [] : [manualHint(q, library || "broll")])].join("\n"));
+      if (!stockSites().length) return text([...lines, `stock: ${NO_KEY}`].join("\n"));
       try {
         const list = await stockSearch(q, { ws, perSite: 5 });
         lines.push(...(list.length ? list.map(formatStock) : ["stock: nothing found (try other words)"]));

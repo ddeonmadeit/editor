@@ -19,7 +19,6 @@ $("tabs").addEventListener("click", (e) => {
   for (const s of document.querySelectorAll(".tab")) s.hidden = s.id !== `tab-${b.dataset.tab}`;
   if (b.dataset.tab === "hooks" && $("hookgen").src === "about:blank") $("hookgen").src = "/hook-gen/";
   if (b.dataset.tab === "videos") loadVideos();
-  if (b.dataset.tab === "broll") loadNeeded();
   try {
     localStorage.setItem("reel-tab", b.dataset.tab);
   } catch {}
@@ -32,7 +31,7 @@ async function loadStatus() {
   $("status").innerHTML = [
     chip(s.ffmpeg, s.ffmpeg ? `ffmpeg ${s.ffmpeg.version}` : "ffmpeg missing"),
     chip(s.hookgen, "hook-gen"),
-    chip(true, s.stock.length ? `B-roll: library + ${s.stock.join(", ")}` : "B-roll: library + Pexels links"),
+    chip(s.stock.length, s.stock.length ? `B-roll: library + ${s.stock.join(", ")}` : "B-roll: no Pixabay key"),
   ].join("");
   $("newLook").innerHTML = s.looks.map((l) => `<option ${l === "white" ? "selected" : ""}>${esc(l)}</option>`).join("");
   $("mcpCfg").textContent = JSON.stringify({ mcpServers: { reel: { command: "npx", args: ["reel", "mcp"], cwd: s.workspace } } }, null, 2);
@@ -152,8 +151,7 @@ $("brollForm").addEventListener("submit", async (e) => {
   if (!q) return;
   $("brollOut").innerHTML = `<p class="hint">Searching…</p>`;
   const r = await api(`/api/broll?q=${encodeURIComponent(q)}`);
-  const hint = r.error && r.error.match(/(https:\/\/www\.pexels\.com\S+)/);
-  const lib = `<div class="clip lib">${r.library ? `Library match: <code>${esc(r.library.file)}</code> (${Math.round(r.library.score * 100)}%) — <code>{ at: "…", src: ${esc(r.library.file)} }</code>` : "No match in your library."}${hint ? ` · <a href="${esc(hint[1])}" target="_blank" rel="noopener">Search Pexels ↗</a>` : r.error ? ` · ${esc(r.error)}` : ""}</div>`;
+  const lib = `<div class="clip lib">${r.library ? `Library match: <code>${esc(r.library.file)}</code> (${Math.round(r.library.score * 100)}%) — <code>{ at: "…", src: ${esc(r.library.file)} }</code>` : "No match in your library."}${r.error ? ` · ${esc(r.error)}` : ""}</div>`;
   $("brollOut").innerHTML =
     lib +
     r.stock.map((c) => `<div class="clip" data-clip="${esc(`${c.site}:${c.id}`)}" title="${esc(c.title || c.page || "")}"><img src="${esc(c.thumb)}" alt="" loading="lazy"><div>${esc(c.site)} · ${Math.round(c.duration * 10) / 10}s · ${c.width}×${c.height}<br>${esc(c.author || String(c.title || "").slice(0, 40))}</div></div>`).join("");
@@ -165,62 +163,10 @@ $("brollOut").addEventListener("click", async (e) => {
   c.querySelector("div").insertAdjacentHTML("beforeend", "<br><b>copied</b>");
 });
 
-// ---------- B-roll needed ----------
-async function loadNeeded() {
-  const lists = await api("/api/broll-needed");
-  const open = lists.flatMap((l) => l.needs.map((n) => ({ ...n, list: l.list, batch: l.batch, rerun: l.rerun })));
-  if (!open.length) {
-    $("needed").innerHTML = `<p class="hint">Nothing needed. When a render can't find a clip, it shows up here.</p>`;
-    return;
-  }
-  $("needed").innerHTML = lists
-    .map(
-      (l) => `<div><p class="hint">${esc(l.batch || l.list)}: download each clip from Pexels (vertical if possible, nothing AI-made), drop it on its row, then <code>${esc(l.rerun)}</code></p><div class="need-list">${l.needs
-        .map(
-          (n) => `<div class="need ${n.done ? "done" : ""}" data-list="${esc(l.list)}" data-i="${n.i}">
-            <span><b>${esc(n.video)}</b> at “${esc(n.at)}”: ${esc(n.q)} ${n.done ? "✓ in place" : ""}</span>
-            <span><a href="${esc(n.search)}" target="_blank" rel="noopener">Pexels ↗</a> <label class="ghost"><input type="file" accept="video/*,image/*" hidden>choose file</label></span>
-            <small>${esc(n.file)}</small></div>`,
-        )
-        .join("")}</div></div>`,
-    )
-    .join("");
-}
-async function fillNeed(row, file) {
-  row.querySelector("small").textContent = `saving ${file.name}…`;
-  const r = await fetch(withToken(`/api/broll-needed/upload?list=${encodeURIComponent(row.dataset.list)}&i=${row.dataset.i}&name=${encodeURIComponent(file.name)}`), { method: "POST", body: file });
-  const j = await r.json();
-  row.querySelector("small").textContent = r.ok ? `saved ${j.path}` : `error: ${j.error}`;
-  if (r.ok) row.classList.add("done");
-}
-$("needed").addEventListener("change", (e) => {
-  const row = e.target.closest(".need");
-  if (row && e.target.files?.[0]) fillNeed(row, e.target.files[0]);
-});
-$("needed").addEventListener("dragover", (e) => {
-  const row = e.target.closest(".need");
-  if (!row) return;
-  e.preventDefault();
-  e.stopPropagation();
-  row.classList.add("over");
-});
-$("needed").addEventListener("dragleave", (e) => e.target.closest(".need")?.classList.remove("over"));
-$("needed").addEventListener("drop", (e) => {
-  const row = e.target.closest(".need");
-  if (!row) return;
-  e.preventDefault();
-  e.stopPropagation();
-  row.classList.remove("over");
-  if (e.dataTransfer.files[0]) fillNeed(row, e.dataTransfer.files[0]);
-});
-$("neededReload").addEventListener("click", loadNeeded);
-
 // ---------- uploads ----------
 let dragDepth = 0;
-// The page-wide drop zone uploads footage; on the B-roll tab, rows take the drops instead.
-const onBrollTab = () => !$("tab-broll").hidden;
 addEventListener("dragenter", (e) => {
-  if (onBrollTab() || ![...(e.dataTransfer?.types || [])].includes("Files")) return;
+  if (![...(e.dataTransfer?.types || [])].includes("Files")) return;
   dragDepth++;
   $("drop").hidden = false;
 });
@@ -230,7 +176,6 @@ addEventListener("dragleave", () => {
 addEventListener("dragover", (e) => e.preventDefault());
 addEventListener("drop", async (e) => {
   e.preventDefault();
-  if (onBrollTab()) return;
   dragDepth = 0;
   $("drop").hidden = true;
   const paths = [];

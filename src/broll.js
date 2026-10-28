@@ -4,18 +4,17 @@ import path from "node:path";
 import YAML from "yaml";
 import { probe } from "./media.js";
 import { norm } from "./transcript.js";
-import { IMAGE_EXT, VIDEO_EXT, ensureDir, readJSON, sha1, slug, stateDir, writeJSON } from "./util.js";
+import { IMAGE_EXT, VIDEO_EXT, ensureDir, readJSON, sha1, stateDir, writeJSON } from "./util.js";
 
-// B-roll comes from the team's own folders first ("library"). When nothing there fits, a
-// stock site with an API key fills in (Pexels; Pixabay only if a batch opts in). Without a
-// key, the clip is listed in a "B-roll needed" file with a Pexels search link and the file
-// name to save it under; once someone drops it in the library, the next render uses it.
-// Pexels' terms forbid automated downloading from its website, so reel never does that.
-// Agents ask for a clip with a few words (`q: "air conditioner"`), never by browsing
-// footage, so finding B-roll costs almost no tokens.
+// B-roll comes from the team's own folders first ("library"), then from Pixabay (free API
+// key), or Pexels first if an old Pexels key is around. Agents ask for a clip with a few
+// words (`q: "air conditioner"`), never by browsing footage, so finding B-roll costs almost
+// no tokens.
 
 // Clips whose title, tags or page slug say they're synthetic or graphics, not filmed.
-const NOT_REAL = /\b(ai|ai generated|generated|generative|midjourney|stable diffusion|sora|runway|3d|render|rendering|cgi|animation|animated|motion graphics|digital art|abstract|illustration|cartoon|hologram|metaverse)\b/;
+// Pixabay tags its AI uploads "ai generated"; the fantasy words catch AI clips that aren't
+// tagged (they're rarely real footage anyway).
+const NOT_REAL = /\b(ai|ai generated|generated|generative|midjourney|stable diffusion|sora|runway|kling|3d|render|rendering|cgi|animation|animated|motion graphics|digital art|abstract|illustration|cartoon|hologram|metaverse|fantasy|surreal|futuristic|sci fi|scifi|cyberpunk|magical|fairy|nymph|mermaid|elf|dragon)\b/;
 const looksSynthetic = (...texts) => NOT_REAL.test(texts.flat().filter(Boolean).join(" ").toLowerCase().replace(/[/_-]+/g, " "));
 const stem = (w) => w.replace(/(ies)$/, "y").replace(/(es|s)$/, "");
 const tokensOf = (s) =>
@@ -23,8 +22,15 @@ const tokensOf = (s) =>
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .split(/[^\p{L}\p{N}]+/u)
     .map(norm)
-    .filter((w) => w && w.length > 1 && !/^\d+$/.test(w) && !["img", "mov", "mp4", "dsc", "clip", "the", "and", "with", "of", "a", "in", "on"].includes(w))
+    .filter((w) => w && w.length > 1 && !/^\d+$/.test(w) && !["img", "mov", "mp4", "dsc", "clip", "the", "and", "with", "of", "a", "in", "on", "at", "to", "for", "new", "old", "my", "our", "your", "some", "very"].includes(w))
     .map(stem);
+
+// "conditioner"/"conditioning", "renovate"/"renovation": a long shared start counts as the same word.
+function sameRoot(a, b) {
+  let n = 0;
+  while (n < a.length && n < b.length && a[n] === b[n]) n++;
+  return n >= 4 && n >= Math.min(a.length, b.length) * 0.75;
+}
 
 // Every video/image in the library folders, with search words from its folder names,
 // file name and the folder's optional tags.yaml ("file.mp4: words that describe it").
@@ -69,9 +75,8 @@ export function searchLibrary(items, q, used = new Set()) {
 // ---------- stock sites ----------
 
 export const STOCK_SITES = ["pexels", "pixabay"];
-// Sites tried when a batch doesn't say. Pixabay accepts AI uploads it can't filter, so a
-// batch has to ask for it (`stock: [pexels, pixabay]`).
-export const DEFAULT_STOCK = ["pexels"];
+// Sites tried, in order, when a batch doesn't say; only those with a key are used.
+export const DEFAULT_STOCK = ["pexels", "pixabay"];
 const DAY = 24 * 3600 * 1000;
 const api = (site, fallback) => process.env[`REEL_${site.toUpperCase()}_API`] || fallback;
 
@@ -79,7 +84,7 @@ async function getJSON(url, headers, name) {
   const r = await fetch(url, { headers });
   if (r.status === 429) throw new Error(`${name} rate limit hit; try again later, or use library clips / src:`);
   if (r.status === 401 || r.status === 403) throw new Error(`${name} rejected the API key (HTTP ${r.status})`);
-  if (!r.ok) throw new Error(`${name} HTTP ${r.status}`);
+  if (!r.ok) throw new Error(`${name} HTTP ${r.status}: ${(await r.text().catch(() => "")).slice(0, 120).trim()}`);
   return r.json();
 }
 
@@ -107,13 +112,12 @@ const SITES = {
     get: (url) => getJSON(url, {}, "Pixabay"),
     map: (v) => {
       const sizes = Object.values(v.videos || {}).filter((f) => f && f.url);
-      const ref = v.videos?.medium || sizes[0] || {};
+      const ref = [...sizes].sort((a, b) => b.width * b.height - a.width * a.height)[0] || {};
       return { site: "pixabay", id: String(v.id), width: ref.width, height: ref.height, duration: v.duration, title: v.tags, author: v.user, page: v.pageURL, thumb: ref.thumbnail, text: [v.tags, v.pageURL], files: sizes.map((f) => ({ link: f.url, width: f.width, height: f.height })) };
     },
-    // video_type=film leaves out animations. Pixabay accepts AI uploads and its API can't
-    // filter them, so only the title/tag check stands between them and the edit.
+    // video_type=film leaves out animations; AI uploads are caught by their tags (see NOT_REAL).
     async search(q, key) {
-      const j = await this.get(`${api("pixabay", "https://pixabay.com")}/api/videos/?key=${encodeURIComponent(key)}&q=${encodeURIComponent(q.slice(0, 100))}&video_type=film&safesearch=true&per_page=20`);
+      const j = await this.get(`${api("pixabay", "https://pixabay.com")}/api/videos/?key=${encodeURIComponent(key)}&q=${encodeURIComponent(q.slice(0, 100))}&video_type=film&safesearch=true&per_page=50`);
       return (j.hits || []).map(this.map).filter((c) => !looksSynthetic(c.text));
     },
     async byId(id, key) {
@@ -126,12 +130,7 @@ const SITES = {
 
 export const stockKey = (site) => SITES[site]?.env.map((e) => process.env[e]).find(Boolean) || "";
 export const stockSites = (order = DEFAULT_STOCK) => [].concat(order).filter((s) => SITES[s] && stockKey(s));
-const NO_KEY = "no stock site key is set (PEXELS_API_KEY; new Pexels keys are paused)";
-
-// A Pexels search for a query, vertical clips first: where a person grabs a missing clip.
-export const pexelsSearchUrl = (q) => `https://www.pexels.com/search/videos/${encodeURIComponent(String(q).trim())}/?orientation=portrait`;
-// The file name a missing clip should be saved under so the library search finds it.
-export const neededName = (q) => `${slug(String(q).toLowerCase()).replace(/[.]+/g, "-") || "clip"}.mp4`;
+export const NO_KEY = "PIXABAY_API_KEY isn't set: make a free Pixabay account, copy the key from https://pixabay.com/api/docs/ into .env";
 
 // Searches one site (results cached on disk for a day, which Pixabay requires and which
 // saves requests). Vertical clips first.
@@ -144,8 +143,17 @@ async function searchSite(site, q, { ws, minDur = 2 }) {
     list = await SITES[site].search(q, stockKey(site));
     writeJSON(file, { t: Date.now(), list });
   }
+  // Stock search is loose (Pixabay ranks by popularity), so rank by how many of the asked-for
+  // words the clip's tags/title actually have; vertical and long-enough only break ties.
+  const want = [...new Set(tokensOf(q))];
+  const rel = (c) => {
+    const have = new Set(tokensOf([c.title, c.page].filter(Boolean).join(" ")));
+    return want.length ? want.filter((w) => have.has(w) || [...have].some((x) => sameRoot(w, x))).length / want.length : 0;
+  };
   const vertical = (c) => c.height > c.width;
-  return [...list].sort((a, b) => vertical(b) - vertical(a) || (b.duration >= minDur) - (a.duration >= minDur));
+  const ranked = list.map((c) => ({ ...c, rel: rel(c) })).sort((a, b) => b.rel - a.rel || vertical(b) - vertical(a) || (b.duration >= minDur) - (a.duration >= minDur));
+  // Clips that share no word with the request are only a last resort.
+  return ranked.some((c) => c.rel > 0) ? ranked.filter((c) => c.rel > 0) : ranked;
 }
 
 // Candidates for a query from every site with a key (or the given ones), in order.
@@ -164,16 +172,15 @@ export async function stockSearch(q, { ws = process.cwd(), sites = DEFAULT_STOCK
   return out;
 }
 
-// What to tell someone when no site with a key can supply a clip: where to look, what to save.
-export const manualHint = (q, saveDir) => `no stock key: get it from ${pexelsSearchUrl(q)} and save as ${path.join(saveDir, neededName(q))}`;
-
 export const formatStock = (c) => `${c.site} ${c.id} ${c.width}x${c.height} ${Math.round(c.duration * 10) / 10}s${c.title ? ` "${String(c.title).slice(0, 50)}"` : ""}${c.author ? ` by ${c.author}` : ""} → clip: ${c.site}:${c.id}`;
 
-// The smallest MP4 that still fills 1080x1920 (or the biggest there is).
+// The smallest MP4 that still fills the 1080x1920 frame without being blown up. A landscape
+// clip is cropped to its middle third, so it needs 1920 px of height (4K) to stay sharp.
 function pickFile(c) {
-  const short = (f) => Math.min(f.width || 0, f.height || 0);
-  const good = c.files.filter((f) => short(f) >= 1080 && (f.fps || 30) <= 61).sort((a, b) => a.width * a.height - b.width * b.height);
-  return good[0] || [...c.files].sort((a, b) => b.width * b.height - a.width * a.height)[0];
+  const fills = (f) => (f.width >= f.height ? f.height >= 1920 : f.width >= 1080 && f.height >= 1920);
+  const area = (f) => (f.width || 0) * (f.height || 0);
+  const good = c.files.filter((f) => fills(f) && (f.fps || 30) <= 61).sort((a, b) => area(a) - area(b));
+  return good[0] || [...c.files].sort((a, b) => area(b) - area(a))[0];
 }
 
 async function download(url, dest) {
@@ -216,8 +223,8 @@ export async function stockFetch(c, { ws = process.cwd() } = {}) {
 //   { at, clip: "pexels:3571264" }     that exact stock clip
 //   { at, pexels: "floor tiles" }      one site only (also pixabay:); a number = clip id
 // A clip isn't reused within a batch while another match exists. A request nothing can fill
-// gets `missing` ({ q, search, file }) instead of failing the video. Returns the stock
-// clips used, for credits.
+// gets `missing` ({ q, reason }): the video renders without it rather than failing. Returns
+// the stock clips used, for credits.
 export async function resolveBroll(videos, { ws = process.cwd(), onLog } = {}) {
   const used = new Set();
   const credits = new Map();
@@ -227,7 +234,6 @@ export async function resolveBroll(videos, { ws = process.cwd(), onLog } = {}) {
     const key = dirs.join("|");
     if (!libCache.has(key)) libCache.set(key, scanLibrary(dirs));
     const lib = libCache.get(key);
-    const saveDir = dirs[0] || path.join(v.base, "broll");
     v.broll = (v.broll || []).map((b) => (typeof b === "string" ? { at: b, q: b } : { ...b }));
     for (const b of v.broll) {
       const only = STOCK_SITES.find((s) => b[s] !== undefined);
@@ -266,14 +272,15 @@ export async function resolveBroll(videos, { ws = process.cwd(), onLog } = {}) {
           const errors = [];
           for (const s of sites) {
             try {
-              const list = await searchSite(s, String(q), { ws, minDur: Number(b.dur) || 2 });
+              // Only clips that have most of the asked-for words: a loose match is worse than none.
+              const list = (await searchSite(s, String(q), { ws, minDur: Number(b.dur) || 2 })).filter((c) => c.rel >= 0.6);
               pick = list.find((c) => !used.has(`${c.site}:${c.id}`)) || list[0];
             } catch (e) {
               errors.push(e.message);
             }
             if (pick) break;
           }
-          if (!pick) throw new Error(errors.length ? errors.join("; ") : `nothing on ${sites.join(", ")} for "${q}"`);
+          if (!pick) throw new Error(errors.length ? errors.join("; ") : `no good match on ${sites.join(", ")}; try other words`);
         }
         const got = await stockFetch(pick, { ws });
         used.add(`${got.site}:${got.id}`);
@@ -283,39 +290,11 @@ export async function resolveBroll(videos, { ws = process.cwd(), onLog } = {}) {
         credits.set(b.found, got);
         onLog?.(`b-roll "${b.clip || q}" → ${SITES[got.site].name} ${got.id}${got.author ? ` by ${got.author}` : ""}`);
       } catch (e) {
-        const term = String(q ?? b.at ?? b.clip);
-        b.missing = { q: term, reason: e.message, search: pexelsSearchUrl(term), file: path.join(saveDir, neededName(term)) };
+        b.missing = { q: String(q ?? b.at ?? b.clip), reason: e.message };
       }
     }
   }
   return [...credits.values()];
-}
-
-// Writes (or clears) the "B-roll needed" list for a batch: a Markdown file for people and
-// a JSON twin the dashboard uses to drop downloaded clips straight into place.
-export function writeNeeded({ dir, batchName, needs, rerun }) {
-  const stem = batchName ? `${batchName.replace(/\.[^.]+$/, "")}-` : "";
-  const md = path.join(dir, `${stem}broll-needed.md`);
-  const json = path.join(dir, `${stem}broll-needed.json`);
-  if (!needs.length) {
-    for (const f of [md, json]) fs.rmSync(f, { force: true });
-    return null;
-  }
-  const lines = [
-    `# B-roll needed${batchName ? `: ${batchName}` : ""}`,
-    "",
-    "Nothing in the B-roll library matched these. Download each from Pexels (pick a vertical",
-    "clip if there is one; nothing AI-made), save it with the file name shown, then re-render:",
-    "",
-    `    ${rerun}`,
-    "",
-    "Or open the reel dashboard (reel serve), B-roll tab, and drop each download on its row.",
-    "",
-  ];
-  for (const n of needs) lines.push(`- [ ] **${n.video}** at "${n.at}": ${n.q}`, `  ${n.search}`, `  save as: \`${n.file}\``, "");
-  fs.writeFileSync(md, lines.join("\n"));
-  writeJSON(json, { batch: batchName || null, rerun, needs });
-  return md;
 }
 
 // Compact listing of a library for agents: name, length, size, tags.

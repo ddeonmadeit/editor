@@ -2,7 +2,7 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { listLooks } from "./batch.js";
-import { manualHint, scanLibrary, searchLibrary, stockSearch, stockSites } from "./broll.js";
+import { NO_KEY, scanLibrary, searchLibrary, stockSearch, stockSites } from "./broll.js";
 import { HOOK_PRESETS, renderHooks } from "./hooks.js";
 import { Jobs } from "./jobs.js";
 import { ffmpegCaps } from "./media.js";
@@ -10,26 +10,7 @@ import { serveFile } from "./static.js";
 import { CAPTION_STYLES } from "./styles.js";
 import { buildLines, formatTranscript } from "./transcript.js";
 import { listIngested, loadTranscript, wordsOf } from "./transcribe.js";
-import { HOOKGEN_DIR, IMAGE_EXT, ROOT, VIDEO_EXT, ensureDir, expandVideos, readJSON, round } from "./util.js";
-
-// The "B-roll needed" lists (*broll-needed.json) up to three folders deep.
-function findNeeded(ws) {
-  const out = [];
-  const walk = (d, depth) => {
-    let entries = [];
-    try {
-      entries = fs.readdirSync(d, { withFileTypes: true });
-    } catch {}
-    for (const e of entries) {
-      if (e.name.startsWith(".") || e.name === "node_modules") continue;
-      const p = path.join(d, e.name);
-      if (e.isDirectory() && depth < 3) walk(p, depth + 1);
-      else if (e.isFile() && /broll-needed\.json$/.test(e.name)) out.push(p);
-    }
-  };
-  walk(ws, 0);
-  return out;
-}
+import { HOOKGEN_DIR, ROOT, VIDEO_EXT, ensureDir, expandVideos, round } from "./util.js";
 
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
 
@@ -138,7 +119,7 @@ export async function serve({ ws = process.cwd(), port = 4317, host = "127.0.0.1
       const query = q.get("q");
       const hit = searchLibrary(scanLibrary([inWs(q.get("lib") || "broll")]), query);
       let stock = [], error;
-      if (!stockSites().length) error = manualHint(query, "broll");
+      if (!stockSites().length) error = NO_KEY;
       else
         try {
           stock = (await stockSearch(query, { ws, perSite: 8 })).map(({ files, text, ...c }) => c);
@@ -146,16 +127,6 @@ export async function serve({ ws = process.cwd(), port = 4317, host = "127.0.0.1
           error = e.message;
         }
       return { library: hit && { file: path.relative(ws, hit.file), score: hit.score }, stock, error };
-    },
-    // Every "B-roll needed" list in the workspace, with which clips are already in place.
-    "GET /api/broll-needed": async () => {
-      const lists = [];
-      for (const f of findNeeded(ws)) {
-        const j = readJSON(f, null);
-        if (!j?.needs) continue;
-        lists.push({ list: path.relative(ws, f), batch: j.batch, rerun: j.rerun, needs: j.needs.map((n, i) => ({ i, video: n.video, at: n.at, q: n.q, search: n.search, file: n.file, done: fs.existsSync(n.file) || fs.existsSync(n.file.replace(/\.mp4$/, ".mov")) })) });
-      }
-      return lists;
     },
   };
 
@@ -175,20 +146,6 @@ export async function serve({ ws = process.cwd(), port = 4317, host = "127.0.0.1
             clearInterval(ping);
           });
           return;
-        }
-        if (p === "/api/broll-needed/upload" && req.method === "POST") {
-          // Saves a downloaded clip under the name its "needed" entry asks for. Only paths
-          // listed in a needed list inside the workspace can be written.
-          const listFile = inWs(url.searchParams.get("list") || "");
-          if (!/broll-needed\.json$/.test(listFile)) return send(res, 400, { error: "not a broll-needed list" });
-          const need = readJSON(listFile, { needs: [] }).needs[Number(url.searchParams.get("i"))];
-          if (!need) return send(res, 404, { error: "no such entry" });
-          const ext = (path.extname(url.searchParams.get("name") || "") || ".mp4").toLowerCase();
-          if (!VIDEO_EXT.test(ext) && !IMAGE_EXT.test(ext)) return send(res, 400, { error: `not a video or image: ${ext}` });
-          const dest = need.file.replace(/\.[^.]+$/, ext);
-          ensureDir(path.dirname(dest));
-          await new Promise((resolve, reject) => req.pipe(fs.createWriteStream(dest)).on("finish", resolve).on("error", reject));
-          return send(res, 200, { path: dest });
         }
         if (p === "/api/upload" && req.method === "POST") {
           // Raw body upload into uploads/ (for agents and browsers without file access).

@@ -70,7 +70,6 @@ export class Jobs extends EventEmitter {
         ...job.results.map((x) => (x.ok ? `✓ ${x.id} → ${x.out} ${Math.round(x.duration * 10) / 10}s${x.warnings?.length ? `  note: ${x.warnings.join("; ")}` : ""}` : `✗ ${x.id}: ${x.errors.join("; ")}`)),
         ...r.warnings.map((w) => `note: ${w}`),
         `${job.results.filter((x) => x.ok).length}/${job.results.length} rendered in ${Math.round(r.secs)}s`,
-        ...(r.needed ? [`B-roll needed: ${r.needed.count} clip(s), no match in the library → ${r.needed.file}`] : []),
       ].join("\n");
     });
   }
@@ -90,7 +89,7 @@ export class Jobs extends EventEmitter {
   }
 
   async plan(batch) {
-    const { plans, warnings, needed } = await planBatch(batch, { ws: this.ws });
-    return [...warnings.map((w) => `note: ${w}`), ...plans.map((p) => formatPlan(p, this.ws)), ...(needed ? [`B-roll needed: ${needed.count} clip(s), no match in the library → ${needed.file}`] : [])].join("\n");
+    const { plans, warnings } = await planBatch(batch, { ws: this.ws });
+    return [...warnings.map((w) => `note: ${w}`), ...plans.map((p) => formatPlan(p, this.ws))].join("\n");
   }
 }

@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { formatPlan, listLooks, planBatch, renderBatch } from "../src/batch.js";
-import { describeLibrary, formatStock, manualHint, scanLibrary, searchLibrary, stockSearch, stockSites } from "../src/broll.js";
+import { NO_KEY, describeLibrary, formatStock, scanLibrary, searchLibrary, stockSearch, stockSites } from "../src/broll.js";
 import { HOOK_PRESETS, renderHooks } from "../src/hooks.js";
 import { ffmpegCaps } from "../src/media.js";
 import { check, formatCheck, sheet } from "../src/qa.js";
@@ -22,7 +22,7 @@ const USAGE = `reel: batch video editor for AI agents (1080x1920, 60 fps)
   reel transcript <id|file>...     numbered transcript lines       --all  --words
   reel check out/                  verify outputs: 1080x1920, 60 fps, audio, -14 LUFS
   reel sheet out/x.mp4             contact sheet PNG for a quick visual check   --cols 6 --rows 3 --at 1,5,9
-  reel broll "air conditioner"     find B-roll: your library, then stock sites    --sheet (thumbnail grid) --lib dir
+  reel broll "air conditioner"     find B-roll: your library, then Pixabay        --sheet (thumbnail grid) --lib dir
   reel library [broll/]            list your B-roll folder (name, length, tags)    --sheet
   reel hook "text" -o hook.png     render one hook with hook-gen   --preset get-known
   reel styles                      looks, caption styles, hook presets
@@ -96,10 +96,9 @@ async function main() {
     }
     case "plan": {
       if (!pos[0]) throw new Error("usage: reel plan edit.yaml");
-      const { plans, warnings, needed } = await planBatch(pos[0], { ws, only: opt.only && String(opt.only).split(","), onLog: log, renderHookPngs: !opt["no-hooks"] });
+      const { plans, warnings } = await planBatch(pos[0], { ws, only: opt.only && String(opt.only).split(","), onLog: log, renderHookPngs: !opt["no-hooks"] });
       for (const w of warnings) say(`note: ${w}`);
       for (const p of plans) say(formatPlan(p, ws));
-      if (needed) say(`B-roll needed: ${needed.count} clip(s), no match in the library → ${needed.file}`);
       if (plans.some((p) => p.errors.length)) process.exitCode = 1;
       break;
     }
@@ -108,7 +107,7 @@ async function main() {
       const tty = process.stderr.isTTY || opt.progress;
       const prog = new Map();
       const draw = () => tty && process.stderr.write(`\r${[...prog].map(([id, p]) => `${id} ${p}%`).join("  ").slice(0, (process.stderr.columns || 120) - 1)}\x1b[K`);
-      const { results, warnings, secs, needed } = await renderBatch(pos[0], {
+      const { results, warnings, secs } = await renderBatch(pos[0], {
         ws,
         only: opt.only && String(opt.only).split(","),
         jobs: opt.jobs,
@@ -129,7 +128,6 @@ async function main() {
       for (const w of warnings) say(`note: ${w}`);
       const good = results.filter((r) => r.ok).length;
       say(`${good}/${results.length} rendered in ${Math.round(secs)}s`);
-      if (needed) say(`B-roll needed: ${needed.count} clip(s), no match in the library → ${needed.file}`);
       if (good < results.length) process.exitCode = 1;
       break;
     }
@@ -159,7 +157,7 @@ async function main() {
       const hit = searchLibrary(scanLibrary(dirs), q);
       say(hit ? `library: ${path.relative(ws, hit.file)} (match ${Math.round(hit.score * 100)}%)` : "library: no match");
       if (!stockSites().length) {
-        if (!hit) say(manualHint(q, path.relative(ws, dirs[0]) || "."));
+        say(`stock: ${NO_KEY}`);
         break;
       }
       try {
