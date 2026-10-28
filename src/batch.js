@@ -29,7 +29,8 @@ export const DEFAULTS = {
   highlight: [],
   fix: {}, // caption spelling: { parks: Parkes, "Travel Pinot": Travelpreneur }
   broll: [], // clips over the speaker: "phrase" | { at, q | src | pexels, dur, layout }
-  library: ["broll"], // your B-roll folders, searched before Pexels
+  library: ["broll"], // your B-roll folders, searched before stock sites
+  stock: ["pexels", "coverr", "pixabay"], // stock sites to try, in order (those with a key)
   texts: [],
   flash: [],
   sfx: [],
@@ -360,10 +361,16 @@ export async function planBatch(input, { ws = process.cwd(), only, onLog, render
   return { plans, warnings: b.warnings, jobs: b.jobs, outDir: b.outDir, credits };
 }
 
-// Pexels asks for credit where possible: one line per clip used, per video.
+// Stock sites ask for credit where possible: one line per clip used, per video.
+const SITE_NAMES = { pexels: "Pexels", coverr: "Coverr", pixabay: "Pixabay" };
 function writeCredits(outDir, plans) {
   const lines = [];
-  for (const p of plans) for (const b of p.broll || []) if (b.credit) lines.push(`${p.id}: "${path.basename(b.src)}" video by ${b.credit.author || "unknown"} on Pexels ${b.credit.url || ""}`.trim());
+  for (const p of plans)
+    for (const b of p.broll || [])
+      if (b.credit) {
+        const c = b.credit;
+        lines.push(`${p.id}: ${SITE_NAMES[c.site] || c.site} ${c.id}${c.title ? ` "${c.title}"` : ""}${c.author ? ` by ${c.author}` : ""} ${c.page || ""}`.trim());
+      }
   if (lines.length) fs.writeFileSync(path.join(ensureDir(outDir), "credits.txt"), `${lines.join("\n")}\n`);
 }
 

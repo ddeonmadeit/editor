@@ -22,9 +22,13 @@ fast and cheap.
 git clone --recursive https://github.com/ddeonmadeit/editor ~/reel-editor
 cd ~/reel-editor && npm install && npm link     # puts `reel` on PATH
 reel setup                                      # transcription model, hook renderer, hook-gen; checks ffmpeg
-echo "PEXELS_API_KEY=<the team's Pexels key>" >> ~/reel-editor/.env
+echo "COVERR_API_KEY=<the team's Coverr key>" >> ~/reel-editor/.env   # stock B-roll, see below
 reel styles                                     # should list looks: getknown, green, orange, white
 ```
+
+The Coverr key is free and instant: sign in at https://coverr.co/developers, then
+Profile → API → create an application. (Pexels has paused new API keys; if the team gets
+one later, add `PEXELS_API_KEY=` too and reel will use Pexels first.)
 
 Needs Node 20+, Python 3 and ffmpeg (`brew install ffmpeg` on a Mac). If `reel` isn't found
 later, use `node ~/reel-editor/bin/reel.js` instead. Don't also run `reel skill`; this file
@@ -60,7 +64,7 @@ transcript cache in a `.reel/` folder there.
    also look at one contact sheet per batch: `reel sheet out/<first video>.mp4` (one small
    image). Only look at more if something seems wrong.
 
-6. **Deliver** the files in `out/` the way you normally deliver. If Pexels clips were used,
+6. **Deliver** the files in `out/` the way you normally deliver. If stock clips were used,
    `out/credits.txt` lists them; pass it along.
 
 7. **Report** to the team (section 7).
@@ -95,12 +99,15 @@ For a quick low-quality preview: add `--quality draft`.
 - Write the phrase where it should start: `broll: ["new floors"]`. To show something other
   than the phrase itself, add a query: `{ at: "the bank", q: "bank building exterior" }`.
 - The client's B-roll folder is searched first (by file names, folder names and an
-  optional `tags.yaml`), then Pexels. Make Pexels queries concrete ("motel room with new
-  floor tiles", not "renovation"). Pexels is real filmed footage; never use AI-generated
+  optional `tags.yaml`), then stock footage (Coverr; Pexels if a key is ever added). Make
+  queries concrete ("motel room with new floor tiles", not "renovation"). reel leaves out
+  clips marked or tagged as AI-generated, 3D or animated; never bring in AI-generated
   B-roll from anywhere else.
-- A specific file: `{ at: "the sign", src: /path/to/sign.mp4 }`. A specific Pexels clip:
-  `{ at: "...", pexels: 3571264 }`. To preview options: `reel broll "query" --sheet`
-  (one thumbnail image).
+- A specific file: `{ at: "the sign", src: /path/to/sign.mp4 }`. To see stock options:
+  `reel broll "query"` (add `--sheet` for one thumbnail image), then pin one with
+  `{ at: "...", clip: "coverr:<id>" }`.
+- Coverr's free plan allows 50 searches an hour (searches are cached for a day). For big
+  batches, lean on the client's library and keep stock to the moments that need it.
 - Speaker on top, B-roll below: add `layout: split`.
 
 **Captions and looks** (`use:` at the top, or per video):
@@ -178,7 +185,7 @@ Keep it short:
 
 ```
 <Client>: 4/4 videos edited with reel, delivered to <place>
-✓ IMG_1201 38.4s  hook "I lost $50K on my first motel deal 💸"  dropped 2,9  B-roll: 1 Pexels
+✓ IMG_1201 38.4s  hook "I lost $50K on my first motel deal 💸"  dropped 2,9  B-roll: 1 Coverr
 ✓ IMG_1202 28.4s  hook "This motel in Parkes is double my age! 🏨👴"  B-roll: 2 library
 Notes: <anything odd, anything reel couldn't do, anything that needed a second try>
 ```
@@ -196,8 +203,9 @@ Notes: <anything odd, anything reel couldn't do, anything that needed a second t
 |---|---|
 | `"..." isn't in the edited video (closest: "...")` | use the closest phrase, or a phrase from a line you didn't drop |
 | `unknown key "..." (did you mean "..."?)` | fix the key name |
-| `no B-roll found locally and PEXELS_API_KEY isn't set` | add the key to `~/reel-editor/.env` |
-| `Pexels rate limit hit` | use library clips or `src:` files, or retry in an hour |
+| `no match in the B-roll library, and no stock footage key is set` | add `COVERR_API_KEY` to `~/reel-editor/.env` |
+| `Coverr rate limit hit` | use library clips or `src:` files, or retry in an hour |
+| `no stock footage for "..."` | try different, more concrete words |
 | `faster-whisper isn't installed` / `can't start a browser` | run `reel setup` |
 | `nothing left after cutting` | you dropped every line; check `drop` |
 | a caption word is spelled wrong | add it to `fix:` |

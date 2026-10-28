@@ -198,7 +198,7 @@ export async function renderSlot(max) {
 }
 
 // Loads KEY=value lines from .env files (without overriding the real environment), so
-// PEXELS_API_KEY and friends can live in the project.
+// stock-site keys and friends can live in the project.
 export function loadDotEnv(dirs) {
   for (const d of dirs) {
     const f = path.join(d, ".env");

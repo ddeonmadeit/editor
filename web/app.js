@@ -31,7 +31,7 @@ async function loadStatus() {
   $("status").innerHTML = [
     chip(s.ffmpeg, s.ffmpeg ? `ffmpeg ${s.ffmpeg.version}` : "ffmpeg missing"),
     chip(s.hookgen, "hook-gen"),
-    chip(s.pexels, s.pexels ? "Pexels" : "Pexels: no key"),
+    chip(s.stock.length, s.stock.length ? `stock: ${s.stock.join(", ")}` : "stock: no key"),
   ].join("");
   $("newLook").innerHTML = s.looks.map((l) => `<option ${l === "white" ? "selected" : ""}>${esc(l)}</option>`).join("");
   $("mcpCfg").textContent = JSON.stringify({ mcpServers: { reel: { command: "npx", args: ["reel", "mcp"], cwd: s.workspace } } }, null, 2);
@@ -151,15 +151,15 @@ $("brollForm").addEventListener("submit", async (e) => {
   if (!q) return;
   $("brollOut").innerHTML = `<p class="hint">Searching…</p>`;
   const r = await api(`/api/broll?q=${encodeURIComponent(q)}`);
-  const lib = `<div class="clip lib">${r.library ? `Library match: <code>${esc(r.library.file)}</code> (${Math.round(r.library.score * 100)}%) — <code>{ at: "…", src: ${esc(r.library.file)} }</code>` : "No match in your library."}${r.error ? ` · Pexels: ${esc(r.error)}` : ""}</div>`;
+  const lib = `<div class="clip lib">${r.library ? `Library match: <code>${esc(r.library.file)}</code> (${Math.round(r.library.score * 100)}%) — <code>{ at: "…", src: ${esc(r.library.file)} }</code>` : "No match in your library."}${r.error ? ` · Stock: ${esc(r.error)}` : ""}</div>`;
   $("brollOut").innerHTML =
     lib +
-    r.pexels.map((v) => `<div class="clip" data-id="${v.id}" title="${esc(v.url)}"><img src="${esc(v.image)}" alt="" loading="lazy"><div>#${v.id} · ${v.duration}s · ${v.width}×${v.height}<br>${esc(v.author || "")}</div></div>`).join("");
+    r.stock.map((c) => `<div class="clip" data-clip="${esc(`${c.site}:${c.id}`)}" title="${esc(c.title || c.page || "")}"><img src="${esc(c.thumb)}" alt="" loading="lazy"><div>${esc(c.site)} · ${Math.round(c.duration * 10) / 10}s · ${c.width}×${c.height}<br>${esc(c.author || String(c.title || "").slice(0, 40))}</div></div>`).join("");
 });
 $("brollOut").addEventListener("click", async (e) => {
-  const c = e.target.closest(".clip[data-id]");
+  const c = e.target.closest(".clip[data-clip]");
   if (!c) return;
-  await navigator.clipboard?.writeText(`{ at: "phrase", pexels: ${c.dataset.id} }`).catch(() => {});
+  await navigator.clipboard?.writeText(`{ at: "phrase", clip: "${c.dataset.clip}" }`).catch(() => {});
   c.querySelector("div").insertAdjacentHTML("beforeend", "<br><b>copied</b>");
 });
 

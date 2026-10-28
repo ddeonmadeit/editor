@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { formatPlan, listLooks, planBatch, renderBatch } from "../src/batch.js";
-import { describeLibrary, pexelsSearch, scanLibrary, searchLibrary } from "../src/broll.js";
+import { describeLibrary, formatStock, scanLibrary, searchLibrary, stockSearch } from "../src/broll.js";
 import { HOOK_PRESETS, renderHooks } from "../src/hooks.js";
 import { ffmpegCaps } from "../src/media.js";
 import { check, formatCheck, sheet } from "../src/qa.js";
@@ -22,7 +22,7 @@ const USAGE = `reel: batch video editor for AI agents (1080x1920, 60 fps)
   reel transcript <id|file>...     numbered transcript lines       --all  --words
   reel check out/                  verify outputs: 1080x1920, 60 fps, audio, -14 LUFS
   reel sheet out/x.mp4             contact sheet PNG for a quick visual check   --cols 6 --rows 3 --at 1,5,9
-  reel broll "air conditioner"     find B-roll: your library first, then Pexels   --sheet (thumbnail grid) --lib dir
+  reel broll "air conditioner"     find B-roll: your library, then stock sites    --sheet (thumbnail grid) --lib dir
   reel library [broll/]            list your B-roll folder (name, length, tags)    --sheet
   reel hook "text" -o hook.png     render one hook with hook-gen   --preset get-known
   reel styles                      looks, caption styles, hook presets
@@ -157,12 +157,13 @@ async function main() {
       const hit = searchLibrary(scanLibrary(dirs), q);
       say(hit ? `library: ${path.relative(ws, hit.file)} (match ${Math.round(hit.score * 100)}%)` : "library: no match");
       try {
-        const list = (await pexelsSearch(q)).slice(0, Number(opt.n) || 8);
-        for (const v of list) say(`pexels ${v.id} ${v.width}x${v.height} ${v.duration}s ${v.author || ""} ${v.url}`);
-        if (opt.sheet && list.length) say(await thumbSheet(list.map((v) => ({ url: v.image, label: String(v.id) })), path.join(ws, ".reel", "sheets", `pexels-${q.replace(/\W+/g, "-")}.png`)));
-        if (list.length) say(`use: broll: [{ at: "phrase", pexels: ${list[0].id} }]`);
+        const list = await stockSearch(q, { ws, perSite: Number(opt.n) || 6 });
+        for (const c of list) say(formatStock(c));
+        if (opt.sheet && list.length) say(await thumbSheet(list.filter((c) => c.thumb).map((c) => ({ url: c.thumb, label: `${c.site}:${c.id}` })), path.join(ws, ".reel", "sheets", `stock-${q.replace(/\W+/g, "-")}.png`)));
+        if (list.length) say(`use: broll: [{ at: "phrase", clip: "${list[0].site}:${list[0].id}" }]`);
+        else say("stock: nothing found (try other words)");
       } catch (e) {
-        say(`pexels: ${e.message}`);
+        say(`stock: ${e.message}`);
       }
       break;
     }

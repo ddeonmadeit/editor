@@ -23,7 +23,7 @@ watch videos, extract frames, or write ffmpeg commands yourself: that is what bu
      off-topic bits, "is it recording?". Check the pre-filled retakes; remove any wrong one.
    - `broll:` 0-4 moments that benefit from cutaways, as the phrase where it should start:
      `broll: ["new floors", { at: "the bank", q: "bank building exterior" }]`. The user's
-     `broll/` folder is searched first, then Pexels (real footage). Don't add B-roll over
+     `broll/` folder is searched first, then stock sites (real footage, AI clips left out). Don't add B-roll over
      the hook or over emotional face-to-camera moments.
    - Optional: `highlight: ["$50,000"]`, `texts:` callouts, a different `use:` look.
    - Names the transcript got wrong: `fix: { parks: Parkes }` (captions only; put
@@ -75,4 +75,5 @@ Everything else: `reel help spec`. B-roll candidates for a phrase: `reel broll "
 If `reel` isn't on PATH, run it as `node <editor repo>/bin/reel.js` (or `npm link` once in
 the repo).
 `reel setup` installs/checks ffmpeg, faster-whisper, the hook renderer and hook-gen.
-Pexels B-roll needs `PEXELS_API_KEY` in the environment or in a `.env` file.
+Stock B-roll needs a key in the environment or `.env`: `COVERR_API_KEY` (free, instant at
+coverr.co/developers), `PIXABAY_API_KEY`, or an existing `PEXELS_API_KEY`.

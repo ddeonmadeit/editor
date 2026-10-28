@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { describeLibrary, pexelsSearch, scanLibrary, searchLibrary } from "./broll.js";
+import { describeLibrary, formatStock, scanLibrary, searchLibrary, stockSearch } from "./broll.js";
 import { Jobs } from "./jobs.js";
 import { check, formatCheck, sheet } from "./qa.js";
 import { buildLines, formatTranscript } from "./transcript.js";
@@ -43,7 +43,7 @@ const TOOLS = [
   },
   {
     name: "reel_broll",
-    description: "Find B-roll for a phrase: your library folder first, then Pexels (real footage, vertical first). Returns ids to use as broll: [{ at, pexels: id }].",
+    description: "Find B-roll for a phrase: your library folder first, then stock sites with real footage (Coverr, Pexels, Pixabay; vertical first, AI clips excluded). Returns clip ids to use as broll: [{ at, clip: \"site:id\" }].",
     inputSchema: { type: "object", properties: { q: { type: "string" }, library: { type: "string", description: "library folder (default broll)" } }, required: ["q"] },
   },
   {
@@ -107,9 +107,10 @@ export async function startMcp({ ws = process.cwd() } = {}) {
       const hit = searchLibrary(scanLibrary([abs(library || "broll")]), q);
       const lines = [hit ? `library: ${path.relative(ws, hit.file)} (${Math.round(hit.score * 100)}%)` : "library: no match"];
       try {
-        for (const v of (await pexelsSearch(q)).slice(0, 8)) lines.push(`pexels ${v.id} ${v.width}x${v.height} ${v.duration}s ${v.url}`);
+        const list = await stockSearch(q, { ws, perSite: 5 });
+        lines.push(...(list.length ? list.map(formatStock) : ["stock: nothing found (try other words)"]));
       } catch (e) {
-        lines.push(`pexels: ${e.message}`);
+        lines.push(`stock: ${e.message}`);
       }
       return text(lines.join("\n"));
     },
