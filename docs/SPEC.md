@@ -98,12 +98,13 @@ Put client-wide names under `defaults:` or in the client's look file.
 
 Ask for B-roll by what it should show. Your library folders are searched first (file
 names, folder names, and an optional `tags.yaml` per folder), then Pixabay: real filmed
-footage, ranked by how many of your words its tags have, vertical first, with AI-tagged,
-3D, animated and fantasy clips left out. Landscape clips are fetched in 4K so the vertical
+footage, ranked by how many of your words its tags have (then how prominent those tags
+are, then vertical first), with AI-tagged, 3D, animated and fantasy clips left out. Landscape clips are fetched in 4K so the vertical
 crop stays sharp. A clip isn't reused within a batch while another match exists. If
 nothing matches most of the words, the video renders without that clip and the plan says
-so: rephrase and re-render. Describe the scene, not just the object ("worker laying floor
-tiles", not "floor tiles"). Clips used are listed in `out/credits.txt`.
+so: use other words and re-render. Write `q` as 1-3 common keywords, the way stock clips
+are tagged ("air conditioning", "signing contract"); long descriptions match nothing.
+Clips used are listed in `out/credits.txt`.
 
 A Pixabay key is built in; `PIXABAY_API_KEY` in the environment or `.env` overrides it, and
 `PIXABAY_API_KEY=off` turns Pixabay off. Searches are cached for a day. An existing
@@ -112,7 +113,7 @@ A Pixabay key is built in; `PIXABAY_API_KEY` in the environment or `.env` overri
 ```yaml
 broll:
   - "new floors"                                   # at that phrase, search for it
-  - { at: "new aircon", q: "air conditioner unit" } # at a phrase, search for something else
+  - { at: "new aircon", q: "air conditioning" }    # at a phrase, search for something else
   - { at: "the banker", src: broll/bank.mp4 }       # a specific file
   - { at: "Friday", clip: "pixabay:124947" }        # an exact clip (ids from `reel broll`)
   - { at: 12.5, src: broll/sign.jpg, dur: 1.5 }     # at output second 12.5; stills get a slow push-in

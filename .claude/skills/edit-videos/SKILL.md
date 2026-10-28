@@ -24,8 +24,9 @@ watch videos, extract frames, or write ffmpeg commands yourself: that is what bu
    - `broll:` 0-4 moments that benefit from cutaways, as the phrase where it should start:
      `broll: ["new floors", { at: "the bank", q: "bank building exterior" }]`. The user's
      `broll/` folder is searched first, then Pixabay (real footage, AI clips left out).
-     Describe the scene for `q` ("worker laying floor tiles"); if nothing matches well the
-     video renders without it and the note says so: rephrase. Don't add B-roll over
+     Write `q` as 1-3 common keywords, the way stock clips are tagged ("air conditioning",
+     "signing contract"); long descriptions match nothing. If nothing matches well the
+     video renders without it and the note says so: use other words. Don't add B-roll over
      the hook or over emotional face-to-camera moments.
    - Optional: `highlight: ["$50,000"]`, `texts:` callouts, a different `use:` look.
    - Names the transcript got wrong: `fix: { parks: Parkes }` (captions only; put
