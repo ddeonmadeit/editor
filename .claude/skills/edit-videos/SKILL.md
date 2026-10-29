@@ -22,12 +22,13 @@ watch videos, extract frames, or write ffmpeg commands yourself: that is what bu
    - `drop:` line numbers to cut: retakes (keep the LAST good take), false starts, rambles,
      off-topic bits, "is it recording?". Check the pre-filled retakes; remove any wrong one.
    - `broll:` 0-4 moments that benefit from cutaways, as the phrase where it should start:
-     `broll: ["new floors", { at: "the bank", q: "bank building exterior" }]`. The user's
-     `broll/` folder is searched first, then Pixabay (real footage, AI clips left out).
+     `broll: ["new floors", { at: "the bank", q: "bank building" }]`. The user's `broll/`
+     folder is searched first, then Pixabay (real footage, never AI), then photos.
      Write `q` as 1-3 common keywords, the way stock clips are tagged ("air conditioning",
-     "signing contract"); long descriptions match nothing. If nothing matches well the
-     video renders without it and the note says so: use other words. Don't add B-roll over
-     the hook or over emotional face-to-camera moments.
+     "signing contract"); long descriptions match nothing. For a named person, place or
+     brand use a photo: `{ at: "Elon", photo: "Elon Musk" }` (Wikipedia / Wikimedia Commons).
+     If nothing matches well the video renders without it and the note says so: use other
+     words. Don't add B-roll over the hook or over emotional face-to-camera moments.
    - Optional: `highlight: ["$50,000"]`, `texts:` callouts, a different `use:` look.
    - Names the transcript got wrong: `fix: { parks: Parkes }` (captions only; put
      client-wide names under `defaults:`).
@@ -71,7 +72,8 @@ speed: 1.1
 ```
 
 Everything else: `reel help spec`. B-roll candidates for a phrase: `reel broll "query"`
-(add `--sheet` for one thumbnail image). What's in the library: `reel library`.
+(`--photo` for photos, `--sheet` for one thumbnail image). What's in the library:
+`reel library`.
 
 ## Setup (only if a command says something is missing)
 

@@ -13,7 +13,7 @@ changing reel itself.
 - `src/transcript.js` numbered lines, retake flags, phrase search. `src/edl.js` kept segments (frame-aligned).
 - `src/captions.js` ASS subtitles; `src/styles.js` caption/text looks; `presets/*.yaml` looks.
 - `src/hooks.js` drives hook-gen (`vendor/hook-gen`, git submodule) in headless Chromium and captures its PNG export.
-- `src/broll.js` library search + stock sites (Pixabay; Pexels if a key exists), ranked by tag match, AI clips filtered. `src/render.js` the ffmpeg filter graph. `src/qa.js` check + contact sheets.
+- `src/broll.js` library search + stock sites (Pixabay; Pexels if a key exists) + photos (Wikipedia/Commons, Pixabay), ranked by tag match, AI items filtered; `src/aicheck.js` reads downloaded files' metadata for AI marks. `src/render.js` the ffmpeg filter graph (stills pan left to right). `src/qa.js` check + contact sheets.
 - `fonts/` static caption fonts (rebuild with `scripts/build-fonts.py`); libass picks them by family name.
 
 ## Rules
@@ -23,4 +23,6 @@ changing reel itself.
   (A/V sync across hundreds of cuts depends on it).
 - Agent-facing output (CLI, MCP, API text) stays short: one line per video, errors that name the fix.
 - No new dependencies without a strong reason (today: `yaml`, `playwright-core`).
+- Never use AI-generated media: any new B-roll source needs the same checks (the site's AI
+  flag, AI words in tags, `aiMarker` on the downloaded file).
 - `npm test` runs unit tests and an end-to-end render (needs ffmpeg only).

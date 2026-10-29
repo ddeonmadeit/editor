@@ -2,7 +2,7 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { listLooks } from "./batch.js";
-import { NO_KEY, scanLibrary, searchLibrary, stockSearch, stockSites } from "./broll.js";
+import { PHOTO_SITES, brollReport, stockName, stockSites } from "./broll.js";
 import { HOOK_PRESETS, renderHooks } from "./hooks.js";
 import { Jobs } from "./jobs.js";
 import { ffmpegCaps } from "./media.js";
@@ -55,7 +55,7 @@ export async function serve({ ws = process.cwd(), port = 4317, host = "127.0.0.1
   const routes = {
     "GET /api/status": async () => {
       const caps = await ffmpegCaps().catch(() => null);
-      return { name: pkg.name, version: pkg.version, workspace: ws, ffmpeg: caps, looks: listLooks(), captionStyles: Object.keys(CAPTION_STYLES), hookPresets: HOOK_PRESETS, stock: stockSites(), hookgen: fs.existsSync(path.join(HOOKGEN_DIR, "index.html")) };
+      return { name: pkg.name, version: pkg.version, workspace: ws, ffmpeg: caps, looks: listLooks(), captionStyles: Object.keys(CAPTION_STYLES), hookPresets: HOOK_PRESETS, stock: stockSites().map(stockName), photos: [...new Set(stockSites(PHOTO_SITES).map(stockName))], hookgen: fs.existsSync(path.join(HOOKGEN_DIR, "index.html")) };
     },
     "GET /api/videos": async () =>
       listIngested(ws).map((v) => {
@@ -116,17 +116,9 @@ export async function serve({ ws = process.cwd(), port = 4317, host = "127.0.0.1
       return raw(fs.readFileSync(file), "image/png");
     },
     "GET /api/broll": async (q) => {
-      const query = q.get("q");
-      const hit = searchLibrary(scanLibrary([inWs(q.get("lib") || "broll")]), query);
-      let stock = [], error;
-      if (!stockSites().length) error = NO_KEY;
-      else
-        try {
-          stock = (await stockSearch(query, { ws, perSite: 8 })).map(({ files, text, ...c }) => c);
-        } catch (e) {
-          error = e.message;
-        }
-      return { library: hit && { file: path.relative(ws, hit.file), score: hit.score }, stock, error };
+      const r = await brollReport(q.get("q"), { ws, dirs: [inWs(q.get("lib") || "broll")], photo: q.get("photo") === "1", perSite: 8 });
+      const notes = r.lines.filter((l) => !/→ clip:|^library:|^use:/.test(l));
+      return { library: r.library && { file: path.relative(ws, r.library.file), score: r.library.score }, stock: r.list.map(({ files, tags, ...c }) => c), notes };
     },
   };
 

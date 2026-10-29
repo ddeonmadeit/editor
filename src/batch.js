@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import YAML from "yaml";
-import { resolveBroll } from "./broll.js";
+import { resolveBroll, stockName } from "./broll.js";
 import { assFile, captionEvents, chunkWords, textEvents } from "./captions.js";
 import { buildEdit } from "./edl.js";
 import { HOOKGEN_FONT_PX, renderHooks } from "./hooks.js";
@@ -28,7 +28,7 @@ export const DEFAULTS = {
   captions: { style: "white", afterHook: true },
   highlight: [],
   fix: {}, // caption spelling: { parks: Parkes, "Travel Pinot": Travelpreneur }
-  broll: [], // clips over the speaker: "phrase" | { at, q | src | pexels, dur, layout }
+  broll: [], // clips over the speaker: "phrase" | { at, q | photo | src | clip, dur, layout }
   library: ["broll"], // your B-roll folders, searched before stock sites
   stock: ["pexels", "pixabay"], // stock sites tried when the library has nothing (those with a key)
   texts: [],
@@ -230,6 +230,7 @@ export async function planVideo(v, { ws, outDir, hookFiles }) {
   // that couldn't be found is left out with a note, so the rest of the video still renders.
   for (const [k, b] of (v.broll || []).entries()) {
     const label = `broll[${k}]`;
+    if (b.note) warnings.push(b.note);
     if (b.missing) {
       warnings.push(`no B-roll for "${b.missing.q}" (${b.missing.reason}); rendered without it`);
       continue;
@@ -366,15 +367,14 @@ export async function planBatch(input, { ws = process.cwd(), only, onLog, render
   return { plans, warnings: b.warnings, jobs: b.jobs, outDir: b.outDir, credits };
 }
 
-// Stock sites ask for credit where possible: one line per clip used, per video.
-const SITE_NAMES = { pexels: "Pexels", pixabay: "Pixabay" };
+// Stock sites ask for credit where possible: one line per clip or photo used, per video.
 function writeCredits(outDir, plans) {
   const lines = [];
   for (const p of plans)
     for (const b of p.broll || [])
       if (b.credit) {
         const c = b.credit;
-        lines.push(`${p.id}: ${SITE_NAMES[c.site] || c.site} ${c.id}${c.title ? ` "${c.title}"` : ""}${c.author ? ` by ${c.author}` : ""} ${c.page || ""}`.trim());
+        lines.push(`${p.id}: ${stockName(c.site)} ${c.kind === "photo" ? "photo" : "video"} ${c.id}${c.title && c.title !== c.id.replace(/\.[^.]+$/, "") ? ` "${c.title}"` : ""}${c.author ? ` by ${c.author}` : ""}${c.license ? ` (${c.license})` : ""} ${c.page || ""}`.trim());
       }
   if (lines.length) fs.writeFileSync(path.join(ensureDir(outDir), "credits.txt"), `${lines.join("\n")}\n`);
 }

@@ -138,10 +138,13 @@ export async function buildCommand(p, tmp, { audioOnly = false, loudness } = {})
     const split = b.layout === "split";
     const bh = split ? H / 2 : H;
     if (isImg) {
-      // Slow push-in on stills: the image is decoded and scaled once (at 2x, so the motion
-      // stays smooth) and zoompan makes the frames.
-      const frames = Math.max(1, Math.round(dur * FPS));
-      g.push(`[${idx}:v]scale=${W * 2}:${bh * 2}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W * 2}:${bh * 2},zoompan=z='1+0.08*on/${frames}':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d=${frames}:s=${W}x${bh}:fps=${FPS},setsar=1[b${k}f]`);
+      // Stills fill the frame top to bottom and pan slowly left to right (30 px/s). The image
+      // is decoded and scaled once, to twice its width, so the window moves exactly half an
+      // output pixel per frame and the pan stays smooth. A little extra width lets even a
+      // 9:16 image move.
+      const frames = Math.round(dur * FPS) + 1;
+      const fill = `max(${W + Math.ceil(frames / 2) + 2}/iw,${bh}/ih)`;
+      g.push(`[${idx}:v]scale=w='2*ceil(iw*${fill})':h='ceil(ih*${fill})':flags=lanczos,format=yuv444p,loop=loop=${frames - 1}:size=1,setpts=N/${FPS}/TB,crop=w=${2 * W}:h=${bh}:x='(iw-ow-${frames - 1})/2+n':y='(ih-oh)*0.4',scale=${W}:${bh}:flags=bilinear,setsar=1[b${k}f]`);
     } else {
       g.push(`[${idx}:v]setpts=PTS-STARTPTS,fps=${FPS}[b${k}i]`);
       g.push(...fitFilter(`b${k}i`, `b${k}f`, W, bh, b.fit || "cover", `b${k}`));

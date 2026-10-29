@@ -99,40 +99,58 @@ Put client-wide names under `defaults:` or in the client's look file.
 Ask for B-roll by what it should show. Your library folders are searched first (file
 names, folder names, and an optional `tags.yaml` per folder), then Pixabay: real filmed
 footage, ranked by how many of your words its tags have (then how prominent those tags
-are, then vertical first), with AI-tagged, 3D, animated and fantasy clips left out. Landscape clips are fetched in 4K so the vertical
-crop stays sharp. A clip isn't reused within a batch while another match exists. If
-nothing matches most of the words, the video renders without that clip and the plan says
-so: use other words and re-render. Write `q` as 1-3 common keywords, the way stock clips
-are tagged ("air conditioning", "signing contract"); long descriptions match nothing.
-Clips used are listed in `out/credits.txt`.
+are, then vertical first). Landscape clips are fetched in 4K so the vertical crop stays
+sharp. If no video matches, a photo is used (Pixabay, then Wikimedia Commons). A clip or
+photo isn't reused within a batch while another match exists. If nothing matches most of
+the words, the video renders without it and the plan says so: use other words and
+re-render. Write `q` as 1-3 common keywords, the way stock clips are tagged ("air
+conditioning", "signing contract"); long descriptions match nothing.
 
-A Pixabay key is built in; `PIXABAY_API_KEY` in the environment or `.env` overrides it, and
-`PIXABAY_API_KEY=off` turns Pixabay off. Searches are cached for a day. An existing
-`PEXELS_API_KEY` also works and is tried first.
+For a named person, place, brand or event, ask for a photo: `photo: "Elon Musk"`. That
+takes the photo at the top of the subject's Wikipedia article, then other Wikimedia Commons
+photos of the subject, then Pixabay photos. Only photographs are used: no paintings,
+caricatures, statues, logos or posters. People with no free photos online (many internet
+personalities) get nothing: put a photo in the library instead.
+
+Stills (photos, and images from the library or `src:`) fill the frame top to bottom and pan
+slowly left to right.
+
+Nothing AI-made is ever used: items the site flags or tags as AI-generated are left out,
+and every downloaded file's metadata is checked for AI marks (IPTC/C2PA "trained
+algorithmic media", generator names, Stable Diffusion settings). A file with one is
+deleted and never offered again, and the next match is used. Library files picked by a
+search get the same metadata check.
+
+Everything used is listed in `out/credits.txt` (author, licence, page). A Pixabay key is
+built in; `PIXABAY_API_KEY` in the environment or `.env` overrides it, and
+`PIXABAY_API_KEY=off` turns Pixabay off. Wikipedia and Commons need no key. Searches are
+cached for a day. An existing `PEXELS_API_KEY` also works and is tried first for video.
 
 ```yaml
 broll:
   - "new floors"                                   # at that phrase, search for it
   - { at: "new aircon", q: "air conditioning" }    # at a phrase, search for something else
+  - { at: "Elon", photo: "Elon Musk" }             # a photo of a named person, place, brand
   - { at: "the banker", src: broll/bank.mp4 }       # a specific file
-  - { at: "Friday", clip: "pixabay:124947" }        # an exact clip (ids from `reel broll`)
-  - { at: 12.5, src: broll/sign.jpg, dur: 1.5 }     # at output second 12.5; stills get a slow push-in
+  - { at: "Friday", clip: "pixabay:124947" }        # an exact clip or photo (ids from `reel broll`)
+  - { at: 12.5, src: broll/sign.jpg, dur: 1.5 }     # at output second 12.5
   - { at: "my documentary", to: "business", q: "film camera", layout: split }
 library: [broll, ~/Footage/motel]                  # where to look first (default: broll/)
-stock: [pixabay]                                   # stock sites to try (default: pexels, pixabay; those with a key)
+stock: [pixabay]                                   # stock video sites to try (default: pexels, pixabay; those with a key)
 ```
 
 | key | meaning |
 |---|---|
 | `at` | a phrase (first match in the edited video), output seconds, or `{line: n}` |
 | `to` | phrase or seconds where it ends; otherwise `dur` (default: the phrase + 0.4 s, at least 2 s) |
-| `q` / `src` / `clip` | what to show (see above) |
+| `q` / `photo` / `src` / `clip` | what to show (see above) |
 | `from` | start this many seconds into the clip |
 | `layout` | `full` (default) or `split` (speaker top half, B-roll bottom half) |
 | `audio` | B-roll sound volume, 0..1 (default 0, muted) |
 | `fit` | `cover` (default) or `blur` |
 
-`tags.yaml` example: `IMG_2034.MOV: new floor tiles being laid in a motel room`.
+`clip` ids: `pixabay:<id>`, `pixabay-photo:<id>`, `wikimedia:<file name>`,
+`pexels:<id>`. `reel broll "words"` lists what a render would pick (`--photo` for photos).
 `tags.yaml` example: `IMG_2034.MOV: new floor tiles being laid in a motel room`.
 
 ## Text callouts, flashes, sound

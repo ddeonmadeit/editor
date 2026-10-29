@@ -40,10 +40,17 @@ $ reel render edit.yaml
   edge, condensed green caps, TikTok native, karaoke; pop-in, highlighted words.
 - **B-roll** by phrase: your library folders first (file names, folders, `tags.yaml`), then
   [Pixabay](https://pixabay.com) filmed footage, fetched automatically: ranked by how well
-  its tags match, vertical first, AI-tagged/3D/animated/fantasy clips left out, 4K for
-  landscape clips so the vertical crop stays sharp, no reuse within a batch, credits in
-  `out/credits.txt`. A request nothing matches well is skipped with a note instead of
-  getting a random clip. Full-screen or split-screen; stills get a slow push-in.
+  its tags match, vertical first, 3D/animated/fantasy clips left out, 4K for landscape clips
+  so the vertical crop stays sharp, no reuse within a batch, credits in `out/credits.txt`.
+  A request nothing matches well is skipped with a note instead of getting a random clip.
+- **Photos** of named people, places and brands (`photo: "Elon Musk"`): the Wikipedia
+  article's lead photo, then [Wikimedia Commons](https://commons.wikimedia.org) photos of the
+  subject, then Pixabay; also used when no stock video matches a request. Stills fill the
+  frame top to bottom with a slow left-to-right pan. Full-screen or split-screen.
+- **Never AI**: AI uploads are dropped by the sites' own flags (Pixabay's `isAiGenerated`,
+  Commons' AI-generated categories) and by their tags, and every downloaded file's metadata
+  is checked for AI marks (IPTC/C2PA "trained algorithmic media", generator names, Stable
+  Diffusion settings) before it's used.
 - **Callouts**: counting money tickers (`-$50,000` ticking up like the reference), colour
   flashes, music with ducking, sound effects.
 - **Audio**: high-pass, gentle compression, presence lift, two-pass loudness to -14 LUFS.
@@ -65,16 +72,20 @@ reel skill          # optional: teach Claude Code the workflow in every folder
 ```
 
 macOS: `brew install ffmpeg python`. Ubuntu: `apt install ffmpeg python3-venv`.
-### Stock B-roll (Pixabay)
+### Stock B-roll (Pixabay, Wikimedia Commons)
 
 A Pixabay API key is built in, so stock B-roll works with no setup. To use your own,
 put `PIXABAY_API_KEY=...` in `.env` (repo or footage folder; free at
-<https://pixabay.com/api/docs/>); `PIXABAY_API_KEY=off` turns Pixabay off. Searches are
-cached for a day (Pixabay asks for that), and only the clips actually used are downloaded.
+<https://pixabay.com/api/docs/>); `PIXABAY_API_KEY=off` turns Pixabay off. Wikipedia and
+Wikimedia Commons need no key. Searches are cached for a day (Pixabay asks for that), and
+only the clips and photos actually used are downloaded.
 
-Pixabay accepts AI-generated uploads, which its API can't filter, so reel drops clips whose
-tags or page name say AI-generated, 3D, animation, CGI or fantasy; Pixabay tags most AI
-uploads that way. An existing Pexels key (`PEXELS_API_KEY`) also works and is tried first.
+Pixabay accepts AI-generated uploads. reel drops everything Pixabay flags as AI
+(`isAiGenerated`) or that is tagged AI-generated, 3D, animation, CGI or fantasy, leaves out
+Commons files in AI-generated categories (and paintings, caricatures, statues and other
+non-photos of a subject), and reads each downloaded file's metadata for AI marks; a file
+that has one is deleted, remembered and replaced by the next match. An existing Pexels key
+(`PEXELS_API_KEY`) also works and is tried first for video.
 
 ## Use it with Claude Code
 
@@ -132,7 +143,7 @@ reel ingest raw/*.mov            transcribe only (--model, --lang, --prompt "nam
 reel transcript <id>             numbered transcript
 reel check out/                  1080x1920, 60 fps, audio, -14 LUFS
 reel sheet out/x.mp4             contact sheet PNG (--at 1,5,9)
-reel broll "query"               library + Pixabay candidates (--sheet)
+reel broll "query"               library + stock candidates (--photo for people/places, --sheet)
 reel library [broll/]            list the B-roll folder (--sheet)
 reel hook "text" -o hook.png     one hook via hook-gen (--preset get-known)
 reel styles                      looks, caption styles, hook presets
@@ -159,7 +170,8 @@ still for previews.
 `src/transcribe.js` + `py/transcribe.py` (faster-whisper, VAD-split) → `src/transcript.js`
 (numbered lines, retakes, phrase lookup) → `src/edl.js` (what survives, frame-aligned) →
 `src/captions.js` (ASS subtitles) + `src/hooks.js` (hook-gen in headless Chromium) +
-`src/broll.js` (library, Pixabay) → `src/render.js` (one ffmpeg filter graph per video:
+`src/broll.js` (library, Pixabay, Wikimedia; `src/aicheck.js` reads file metadata for AI
+marks) → `src/render.js` (one ffmpeg filter graph per video:
 trim/crop/scale each kept segment once, overlays, libass, loudness, x264/VideoToolbox) →
 `src/batch.js` (plans and renders a batch in parallel). `src/server.js` and `src/mcp.js` are
 thin layers over the same functions.
@@ -169,5 +181,6 @@ thin layers over the same functions.
 Code: MIT. Caption fonts in `fonts/` are static cuts of Arimo, Inter, Montserrat, TikTok
 Sans, Anton and Bebas Neue under the SIL Open Font License (see `fonts/LICENSES.md`).
 Hooks: [hook-gen](https://github.com/ddeonmadeit/hook-gen) (git submodule). Stock B-roll is
-under the [Pixabay content license](https://pixabay.com/service/license-summary/); the clips
-used are listed in `out/credits.txt`.
+under the [Pixabay content license](https://pixabay.com/service/license-summary/); Wikimedia
+Commons photos are under their own free licences (mostly Creative Commons). Everything used
+is listed in `out/credits.txt` with its author and licence.

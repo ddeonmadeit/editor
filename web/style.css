@@ -38,6 +38,8 @@ main { padding: 16px 18px; }
 .row.wrap { flex-wrap: wrap; }
 .grow { flex: 1; min-width: 0; }
 .hint { color: var(--muted); font-size: 12.5px; margin: 0; }
+.check { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; white-space: nowrap; }
+.check input { padding: 0; }
 
 button, input, select { font: inherit; color: var(--text); background: #1f232b; border: 1px solid var(--line); border-radius: 8px; padding: 6px 11px; }
 button { cursor: pointer; }

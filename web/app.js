@@ -32,6 +32,7 @@ async function loadStatus() {
     chip(s.ffmpeg, s.ffmpeg ? `ffmpeg ${s.ffmpeg.version}` : "ffmpeg missing"),
     chip(s.hookgen, "hook-gen"),
     chip(s.stock.length, s.stock.length ? `B-roll: library + ${s.stock.join(", ")}` : "B-roll: library only"),
+    chip(s.photos.length, `photos: ${s.photos.join(", ") || "off"}`),
   ].join("");
   $("newLook").innerHTML = s.looks.map((l) => `<option ${l === "white" ? "selected" : ""}>${esc(l)}</option>`).join("");
   $("mcpCfg").textContent = JSON.stringify({ mcpServers: { reel: { command: "npx", args: ["reel", "mcp"], cwd: s.workspace } } }, null, 2);
@@ -150,11 +151,11 @@ $("brollForm").addEventListener("submit", async (e) => {
   const q = $("brollQ").value.trim();
   if (!q) return;
   $("brollOut").innerHTML = `<p class="hint">Searching…</p>`;
-  const r = await api(`/api/broll?q=${encodeURIComponent(q)}`);
-  const lib = `<div class="clip lib">${r.library ? `Library match: <code>${esc(r.library.file)}</code> (${Math.round(r.library.score * 100)}%) — <code>{ at: "…", src: ${esc(r.library.file)} }</code>` : "No match in your library."}${r.error ? ` · ${esc(r.error)}` : ""}</div>`;
+  const r = await api(`/api/broll?q=${encodeURIComponent(q)}${$("brollPhoto").checked ? "&photo=1" : ""}`);
+  const lib = `<div class="clip lib">${r.library ? `Library match: <code>${esc(r.library.file)}</code> (${Math.round(r.library.score * 100)}%) — <code>{ at: "…", src: ${esc(r.library.file)} }</code>` : "No match in your library."}${r.notes.length ? ` · ${esc(r.notes.join(" · "))}` : ""}</div>`;
   $("brollOut").innerHTML =
     lib +
-    r.stock.map((c) => `<div class="clip" data-clip="${esc(`${c.site}:${c.id}`)}" title="${esc(c.title || c.page || "")}"><img src="${esc(c.thumb)}" alt="" loading="lazy"><div>${esc(c.site)} · ${Math.round(c.duration * 10) / 10}s · ${c.width}×${c.height}<br>${esc(c.author || String(c.title || "").slice(0, 40))}</div></div>`).join("");
+    r.stock.map((c) => `<div class="clip" data-clip="${esc(`${c.site}:${c.id}`)}" title="${esc(c.title || c.page || "")}"><img src="${esc(c.thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer"><div>${c.good ? "✓ " : ""}${esc(c.site)} · ${c.kind === "photo" ? "photo" : `${Math.round(c.duration * 10) / 10}s`} · ${c.width}×${c.height}<br>${esc(String(c.author || c.title || "").slice(0, 40))}</div></div>`).join("");
 });
 $("brollOut").addEventListener("click", async (e) => {
   const c = e.target.closest(".clip[data-clip]");

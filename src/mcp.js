@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { NO_KEY, describeLibrary, formatStock, scanLibrary, searchLibrary, stockSearch, stockSites } from "./broll.js";
+import { brollReport, describeLibrary } from "./broll.js";
 import { Jobs } from "./jobs.js";
 import { check, formatCheck, sheet } from "./qa.js";
 import { buildLines, formatTranscript } from "./transcript.js";
@@ -43,8 +43,8 @@ const TOOLS = [
   },
   {
     name: "reel_broll",
-    description: "Find B-roll for a phrase: your library folder first, then Pixabay (real footage, vertical first, AI clips left out). Returns clip ids to pin with broll: [{ at, clip: \"pixabay:<id>\" }].",
-    inputSchema: { type: "object", properties: { q: { type: "string" }, library: { type: "string", description: "library folder (default broll)" } }, required: ["q"] },
+    description: "Find B-roll for a phrase: your library folder first, then Pixabay videos (real footage, never AI), then photos. photo: true finds photos of a named person, place or brand (Wikipedia / Wikimedia Commons, then Pixabay). Returns ids to pin with broll: [{ at, clip: \"site:id\" }].",
+    inputSchema: { type: "object", properties: { q: { type: "string" }, photo: { type: "boolean", description: "photos of a named person, place or brand" }, library: { type: "string", description: "library folder (default broll)" } }, required: ["q"] },
   },
   {
     name: "reel_library",
@@ -103,17 +103,8 @@ export async function startMcp({ ws = process.cwd() } = {}) {
       const file = await sheet(abs(video), { ws, at });
       return { content: [{ type: "image", data: fs.readFileSync(file).toString("base64"), mimeType: "image/png" }, { type: "text", text: path.relative(ws, file) }] };
     },
-    async reel_broll({ q, library }) {
-      const hit = searchLibrary(scanLibrary([abs(library || "broll")]), q);
-      const lines = [hit ? `library: ${path.relative(ws, hit.file)} (${Math.round(hit.score * 100)}%)` : "library: no match"];
-      if (!stockSites().length) return text([...lines, `stock: ${NO_KEY}`].join("\n"));
-      try {
-        const list = await stockSearch(q, { ws, perSite: 5 });
-        lines.push(...(list.length ? list.map(formatStock) : ["stock: nothing found (try other words)"]));
-      } catch (e) {
-        lines.push(`stock: ${e.message}`);
-      }
-      return text(lines.join("\n"));
+    async reel_broll({ q, photo, library }) {
+      return text((await brollReport(q, { ws, dirs: [abs(library || "broll")], photo: !!photo, perSite: 5 })).lines.join("\n"));
     },
     async reel_library({ dir } = {}) {
       return text((await describeLibrary([abs(dir || "broll")])).text || "empty library");

@@ -20,12 +20,13 @@ fast and cheap.
 
 ## 1. Setup
 
-**If reel is already installed** (`~/reel-editor` exists), update it now; the stock B-roll
-key is only in the latest version:
+**If reel is already installed** (`~/reel-editor` exists), update it now; photo B-roll
+(celebrities, places, brands) and the new photo pan are only in the latest version:
 
 ```bash
 cd ~/reel-editor && git pull --recurse-submodules && npm install
 reel broll "air conditioning"                   # should list Pixabay clips
+reel broll --photo "Elon Musk"                  # should list Wikimedia Commons photos
 ```
 
 If an earlier version of these instructions had you add a `PIXABAY_API_KEY` line to
@@ -39,12 +40,14 @@ cd ~/reel-editor && npm install && npm link     # puts `reel` on PATH
 reel setup                                      # transcription model, hook renderer, hook-gen; checks ffmpeg
 reel styles                                     # should list looks: getknown, green, orange, white
 reel broll "air conditioning"                   # should list Pixabay clips
+reel broll --photo "Elon Musk"                  # should list Wikimedia Commons photos
 ```
 
 Needs Node 20+, Python 3 and ffmpeg (`brew install ffmpeg` on a Mac). No API keys to set
-up: stock B-roll comes from Pixabay with a key built into reel. If `reel` isn't found
-later, use `node ~/reel-editor/bin/reel.js` instead. Don't also run `reel skill`; this file
-is your instructions. To update reel later, run the update command above.
+up: stock video comes from Pixabay with a key built into reel; photos come from Wikipedia /
+Wikimedia Commons (no key) and Pixabay. If `reel` isn't found later, use
+`node ~/reel-editor/bin/reel.js` instead. Don't also run `reel skill`; this file is your
+instructions. To update reel later, run the update command above.
 
 ## 2. Every job, step by step
 
@@ -72,17 +75,18 @@ transcript cache in a `.reel/` folder there.
 4. **Render:** `reel render edit.yaml`. All videos render in parallel; you get one line per
    video. Don't render videos one at a time.
 
-   If a video's line has a note like **`no B-roll for "..." (no good match on pixabay; try
-   other words)`**, that clip was skipped (the video rendered without it). Change that `q`
-   to fewer, more common words (see B-roll in section 3), then
-   `reel render edit.yaml --only <id>`. If it still finds nothing, leave it out.
+   If a video's line has a note like **`no B-roll for "..." (no good match on Pixabay, ...;
+   try other words)`**, that B-roll was skipped (the video rendered without it). Change
+   that `q` to fewer, more common words, or use `photo:` for a person, place or brand (see
+   B-roll in section 3), then `reel render edit.yaml --only <id>`. If it still finds
+   nothing, leave it out.
 
 5. **Verify:** `reel check out/` (1080x1920, 60 fps, audio, -14 LUFS). During the trial,
    also look at one contact sheet per batch: `reel sheet out/<first video>.mp4` (one small
    image). Only look at more if something seems wrong.
 
 6. **Deliver** the files in `out/` the way you normally deliver. `out/credits.txt` lists
-   the Pixabay clips used; pass it along.
+   the stock clips and photos used (author, licence, link); pass it along.
 
 7. **Report** to the team (section 7).
 
@@ -111,29 +115,43 @@ For a quick low-quality preview: add `--quality draft`.
 - Don't drop for pauses or "um"s; reel cuts those automatically.
 
 **B-roll** (0-4 per video, 1.5-3 s each):
-- Use it where the speaker names something visual (a place, an object, an action) or to
-  break up a long talking stretch. Not during the hook, not over emotional to-camera moments.
+- Use it where the speaker names something visual (a place, an object, an action, a famous
+  person) or to break up a long talking stretch. Not during the hook, not over emotional
+  to-camera moments.
 - Write the phrase where it should start, plus what to show:
   `{ at: "new aircon", q: "air conditioning" }`. Without `q`, the phrase itself is searched.
 - reel looks in the client's B-roll folder first (file names, folder names and an optional
   `tags.yaml`), then fetches real filmed footage from Pixabay by itself. Pixabay finds
   clips by their tags, so reel only uses a clip whose tags contain most of your words,
   prefers clips where they're the main tags, prefers vertical, and leaves out anything
-  tagged AI-generated, 3D, animated or fantasy.
+  3D, animated or fantasy. If no video matches, it uses a photo instead.
 - So write `q` the way a stock clip would be tagged: **1-3 common keywords**. These all find
   good clips: "air conditioning", "paint roller", "renovation", "construction worker",
   "counting money", "cash money", "handshake deal", "signing contract", "business meeting",
   "hotel room", "city traffic night", "gym workout", "coffee shop". Long descriptions
   ("hand holding air conditioner remote") and niche words ("tiler", "plumber") usually
   match nothing and get skipped: use broader words instead.
+- **People, places, brands and events: use `photo:`**, e.g. `{ at: "Elon", photo: "Elon Musk" }`.
+  reel takes the photo at the top of their Wikipedia article, then other real photos of
+  them from Wikimedia Commons (never paintings, caricatures, statues or logos), then
+  Pixabay. Write the name the way Wikipedia spells it: "Taylor Swift", "Burj Khalifa",
+  "Tesla Cybertruck", "Super Bowl". Many internet personalities have no free photos online;
+  then the note says nothing was found: leave it out, or tell the team in the report so
+  they can add a photo to the client's B-roll folder.
+- Photos fill the screen top to bottom with a slow, subtle left-to-right pan.
 - Tags can match literally but miss the context ("floor tiles" found rain on a tiled
-  sidewalk). When a B-roll moment really matters, check first: `reel broll "<q>"` lists
-  the matches, best first; add `--sheet` for one thumbnail image. Pin the one you want with
-  `{ at: "...", clip: "pixabay:<id>" }`.
-- Never download B-roll yourself from any website, and never use AI-generated B-roll.
+  sidewalk). When a B-roll moment really matters, check first: `reel broll "<q>"` (or
+  `reel broll --photo "<name>"`) lists what a render would pick, best first; add `--sheet`
+  for one thumbnail image. Pin the one you want by copying its id exactly:
+  `{ at: "...", clip: "pixabay:<id>" }` or `{ at: "...", clip: "wikimedia:<file name>.jpg" }`.
+- **Never use AI-generated photos or video.** reel already refuses them: it skips anything
+  the sites flag or tag as AI and checks every downloaded file's metadata for AI marks.
+  Never download B-roll yourself from any website (no Google Images), and never work
+  around a skip.
 - A specific file: `{ at: "the sign", src: /path/to/sign.mp4 }`. What's in the client's
   folder: `reel library`.
-- Prefer the client's own footage; use Pixabay for moments their footage doesn't cover.
+- Prefer the client's own footage; use Pixabay and photos for moments their footage
+  doesn't cover.
 - Speaker on top, B-roll below: add `layout: split`.
 
 **Captions and looks** (`use:` at the top, or per video):
@@ -195,6 +213,7 @@ videos:
     texts: [{ at: 0, text: "-$50,000", style: red, count: 1, dur: 3.5 }]
     broll:
       - { at: "shitty lawyer", q: "signing contract" }
+      - { at: "Grant Cardone", photo: "Grant Cardone" }
     # 1 0 I lost $50,000 on my first motel deal.
     # 2 2.6 So when I locked in my first motel, I put a 50-  R>3
     # 3 5.2 So when I locked in my first motel, I put a $50,000 deposit to secure the deal.
@@ -211,7 +230,7 @@ Keep it short:
 
 ```
 <Client>: 4/4 videos edited with reel, delivered to <place>
-✓ IMG_1201 38.4s  hook "I lost $50K on my first motel deal 💸"  dropped 2,9  B-roll: 2 library, 1 Pixabay
+✓ IMG_1201 38.4s  hook "I lost $50K on my first motel deal 💸"  dropped 2,9  B-roll: 2 library, 1 Pixabay, 1 photo
 ✓ IMG_1202 28.4s  hook "This motel in Parkes is double my age! 🏨👴"  B-roll: 2 library
 Notes: <anything odd, anything reel couldn't do, anything that needed a second try>
 ```
@@ -229,8 +248,9 @@ Notes: <anything odd, anything reel couldn't do, anything that needed a second t
 |---|---|
 | `"..." isn't in the edited video (closest: "...")` | use the closest phrase, or a phrase from a line you didn't drop |
 | `unknown key "..." (did you mean "..."?)` | fix the key name |
-| `no B-roll for "..." (no good match on pixabay; try other words)` | use 1-3 common keywords for `q` and re-render that video, or drop that B-roll |
-| `Pixabay rate limit hit` | wait a minute and re-render (limit: 100 searches a minute) |
+| `no B-roll for "..." (no good match on ...; try other words)` | things: 1-3 common keywords for `q`; a person, place or brand: `photo: "Full Name"`. Re-render that video, or drop that B-roll |
+| `... is AI-generated ...` in a note | nothing to do: reel skipped it and used the next match (or none). Never work around it |
+| `Pixabay rate limit hit` / `Wikimedia rate limit hit` | wait a minute and re-render (Pixabay allows 100 searches a minute) |
 | `faster-whisper isn't installed` / `can't start a browser` | run `reel setup` |
 | `nothing left after cutting` | you dropped every line; check `drop` |
 | a caption word is spelled wrong | add it to `fix:` |

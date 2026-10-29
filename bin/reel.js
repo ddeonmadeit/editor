@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { formatPlan, listLooks, planBatch, renderBatch } from "../src/batch.js";
-import { NO_KEY, describeLibrary, formatStock, scanLibrary, searchLibrary, stockSearch, stockSites } from "../src/broll.js";
+import { brollReport, describeLibrary, fetchMedia } from "../src/broll.js";
 import { HOOK_PRESETS, renderHooks } from "../src/hooks.js";
 import { ffmpegCaps } from "../src/media.js";
 import { check, formatCheck, sheet } from "../src/qa.js";
@@ -10,7 +10,7 @@ import { newBatch } from "../src/scaffold.js";
 import { CAPTION_STYLES, TEXT_STYLES } from "../src/styles.js";
 import { buildLines, formatTranscript } from "../src/transcript.js";
 import { ingest, listIngested, loadTranscript, saveTranscript, wordsOf } from "../src/transcribe.js";
-import { HOOKGEN_DIR, ROOT, VIDEO_EXT, expandVideos, fmtDur, loadDotEnv, round, run } from "../src/util.js";
+import { HOOKGEN_DIR, ROOT, VIDEO_EXT, expandVideos, fmtDur, loadDotEnv, pool, round, run } from "../src/util.js";
 
 const USAGE = `reel: batch video editor for AI agents (1080x1920, 60 fps)
 
@@ -22,7 +22,7 @@ const USAGE = `reel: batch video editor for AI agents (1080x1920, 60 fps)
   reel transcript <id|file>...     numbered transcript lines       --all  --words
   reel check out/                  verify outputs: 1080x1920, 60 fps, audio, -14 LUFS
   reel sheet out/x.mp4             contact sheet PNG for a quick visual check   --cols 6 --rows 3 --at 1,5,9
-  reel broll "air conditioner"     find B-roll: your library, then Pixabay        --sheet (thumbnail grid) --lib dir
+  reel broll "air conditioner"     find B-roll: library, Pixabay, then photos      --photo (person, place, brand) --sheet --lib dir
   reel library [broll/]            list your B-roll folder (name, length, tags)    --sheet
   reel hook "text" -o hook.png     render one hook with hook-gen   --preset get-known
   reel styles                      looks, caption styles, hook presets
@@ -41,7 +41,7 @@ function parseArgs(argv) {
     else if (a.startsWith("--")) {
       const [k, v] = a.slice(2).split("=");
       if (v !== undefined) opt[k] = v;
-      else if (i + 1 < argv.length && !argv[i + 1].startsWith("--") && !["all", "words", "force", "draft", "progress"].includes(k)) opt[k] = argv[++i];
+      else if (i + 1 < argv.length && !argv[i + 1].startsWith("--") && !["all", "words", "force", "draft", "progress", "photo", "sheet"].includes(k)) opt[k] = argv[++i];
       else opt[k] = true;
     } else pos.push(a);
   }
@@ -151,24 +151,13 @@ async function main() {
       break;
     }
     case "broll": {
-      if (!pos[0]) throw new Error('usage: reel broll "what you need"');
+      if (!pos[0]) throw new Error('usage: reel broll "what you need" [--photo]');
       const q = pos.join(" ");
       const dirs = [].concat(opt.lib || "broll").map((d) => path.resolve(ws, d));
-      const hit = searchLibrary(scanLibrary(dirs), q);
-      say(hit ? `library: ${path.relative(ws, hit.file)} (match ${Math.round(hit.score * 100)}%)` : "library: no match");
-      if (!stockSites().length) {
-        say(`stock: ${NO_KEY}`);
-        break;
-      }
-      try {
-        const list = await stockSearch(q, { ws, perSite: Number(opt.n) || 6 });
-        for (const c of list) say(formatStock(c));
-        if (opt.sheet && list.length) say(await thumbSheet(list.filter((c) => c.thumb).map((c) => ({ url: c.thumb, label: `${c.site}:${c.id}` })), path.join(ws, ".reel", "sheets", `stock-${q.replace(/\W+/g, "-")}.png`)));
-        if (list.length) say(`use: broll: [{ at: "phrase", clip: "${list[0].site}:${list[0].id}" }]`);
-        else say("stock: nothing found (try other words)");
-      } catch (e) {
-        say(`stock: ${e.message}`);
-      }
+      const { list, lines } = await brollReport(q, { ws, dirs, photo: !!opt.photo, perSite: Number(opt.n) || 6 });
+      for (const l of lines) say(l);
+      const thumbs = list.filter((c) => c.thumb);
+      if (opt.sheet && thumbs.length) say(await thumbSheet(thumbs.map((c) => ({ url: c.thumb, label: `${c.site}:${c.id}`.slice(0, 40) })), path.join(ws, ".reel", "sheets", `stock-${q.replace(/\W+/g, "-")}.png`)));
       break;
     }
     case "library": {
@@ -233,14 +222,12 @@ async function main() {
 async function thumbSheet(items, dest) {
   const dir = fs.mkdtempSync(path.join(ws, ".reel-thumbs-"));
   try {
-    await Promise.all(
-      items.map(async (it, i) => {
-        const r = await fetch(it.url);
-        const f = path.join(dir, `in${i}.jpg`);
-        fs.writeFileSync(f, Buffer.from(await r.arrayBuffer()));
-        await labelFrame(f, it.label, path.join(dir, `${String(i).padStart(3, "0")}.png`));
-      }),
-    );
+    await pool(items, 3, async (it, i) => {
+      const r = await fetchMedia(it.url);
+      const f = path.join(dir, `in${i}.jpg`);
+      fs.writeFileSync(f, Buffer.from(await r.arrayBuffer()));
+      await labelFrame(f, it.label, path.join(dir, `${String(i).padStart(3, "0")}.png`));
+    });
     return await tile(dir, items.length, dest);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
