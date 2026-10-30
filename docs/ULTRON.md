@@ -20,8 +20,8 @@ fast and cheap.
 
 ## 1. Setup
 
-**If reel is already installed** (`~/reel-editor` exists), update it now; photo B-roll
-(celebrities, places, brands) and the new photo pan are only in the latest version:
+**If reel is already installed** (`~/reel-editor` exists), update it once now. After
+that reel keeps itself up to date:
 
 ```bash
 cd ~/reel-editor && git pull --recurse-submodules && npm install
@@ -47,7 +47,10 @@ Needs Node 20+, Python 3 and ffmpeg (`brew install ffmpeg` on a Mac). No API key
 up: stock video comes from Pixabay with a key built into reel; photos come from Wikipedia /
 Wikimedia Commons (no key) and Pixabay. If `reel` isn't found later, use
 `node ~/reel-editor/bin/reel.js` instead. Don't also run `reel skill`; this file is your
-instructions. To update reel later, run the update command above.
+instructions. reel updates itself before commands, so you never need to update it by hand.
+
+**New features are announced at the top of every `edit.yaml`** that `reel new` writes. Read
+those tips on every job; where they differ from this file, follow the tips.
 
 ## 2. Every job, step by step
 

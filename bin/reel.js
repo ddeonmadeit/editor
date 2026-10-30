@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { formatPlan, listLooks, planBatch, renderBatch } from "../src/batch.js";
@@ -10,6 +11,7 @@ import { newBatch } from "../src/scaffold.js";
 import { CAPTION_STYLES, TEXT_STYLES } from "../src/styles.js";
 import { buildLines, formatTranscript } from "../src/transcript.js";
 import { ingest, listIngested, loadTranscript, saveTranscript, wordsOf } from "../src/transcribe.js";
+import { autoUpdate } from "../src/update.js";
 import { HOOKGEN_DIR, ROOT, VIDEO_EXT, expandVideos, fmtDur, loadDotEnv, pool, round, run } from "../src/util.js";
 
 const USAGE = `reel: batch video editor for AI agents (1080x1920, 60 fps)
@@ -57,6 +59,12 @@ const say = (s) => process.stdout.write(`${s}\n`);
 async function main() {
   const [cmd, ...rest] = process.argv.slice(2);
   const { pos, opt } = parseArgs(rest);
+  // Stay on the latest reel; after an update, run the command again on the new code.
+  if (cmd && !["help", "--help", "-h"].includes(cmd) && !process.env.NODE_TEST_CONTEXT && autoUpdate({ log })) {
+    const r = spawnSync(process.execPath, process.argv.slice(1), { stdio: "inherit", env: { ...process.env, REEL_NO_UPDATE: "1" } });
+    process.exitCode = r.status ?? 1;
+    return;
+  }
   switch (cmd) {
     case "new": {
       if (pos.length < 2) throw new Error("usage: reel new edit.yaml raw/*.mov");

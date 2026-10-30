@@ -6,7 +6,7 @@ changing reel itself.
 
 ## Layout
 
-- `bin/reel.js` CLI. `src/server.js` website + HTTP API, `src/mcp.js` MCP server; both are thin
+- `bin/reel.js` CLI (self-updates first: `src/update.js`). `src/server.js` website + HTTP API, `src/mcp.js` MCP server; both are thin
   layers over the same functions as the CLI.
 - `src/batch.js` batch YAML → per-video plans (`DEFAULTS` is the full option list) → parallel renders.
 - `src/transcribe.js` + `py/transcribe.py` faster-whisper (VAD-split clips so retakes survive), cache in `.reel/`.
@@ -25,4 +25,7 @@ changing reel itself.
 - No new dependencies without a strong reason (today: `yaml`, `playwright-core`).
 - Never use AI-generated media: any new B-roll source needs the same checks (the site's AI
   flag, AI words in tags, `aiMarker` on the downloaded file).
+- Installs update themselves (`src/update.js`), and agents' own instructions are never re-sent:
+  tell agents about a new feature in `TIPS` (`src/scaffold.js`, the top of every `edit.yaml`)
+  and in the notes/errors that name the fix. Keep old batch keys working.
 - `npm test` runs unit tests and an end-to-end render (needs ffmpeg only).

@@ -421,7 +421,8 @@ async function findStock(q, { ws, used, minDur, order }) {
       }
     }
   }
-  throw new Error([...(looked.length ? [`no good match on ${looked.join(", ")}; try other words`] : []), ...errors].join("; ") || "nothing to search");
+  const hint = videos.length ? ', or photo: "Name" for a person, place or brand' : "";
+  throw new Error([...(looked.length ? [`no good match on ${looked.join(", ")}; try other words${hint}`] : []), ...errors].join("; ") || "nothing to search");
 }
 
 const splitClip = (s) => {

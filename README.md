@@ -72,6 +72,16 @@ reel skill          # optional: teach Claude Code the workflow in every folder
 ```
 
 macOS: `brew install ffmpeg python`. Ubuntu: `apt install ffmpeg python3-venv`.
+
+### Updates
+
+reel updates itself: before a command (at most every 10 minutes) it fetches the branch it
+was cloned from and fast-forwards to it, with submodules and npm packages, then runs the
+command on the new code. It skips this when the checkout has local edits or commits, or
+is offline; `REEL_NO_UPDATE=1` turns it off. New features reach agents through the tips at
+the top of every `edit.yaml` that `reel new` writes, so their instructions never need
+re-sending.
+
 ### Stock B-roll (Pixabay, Wikimedia Commons)
 
 A Pixabay API key is built in, so stock B-roll works with no setup. To use your own,

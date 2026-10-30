@@ -5,6 +5,16 @@ import { buildLines, formatTranscript } from "./transcript.js";
 import { ingest, wordsOf } from "./transcribe.js";
 import { expandVideos, fmtDur } from "./util.js";
 
+// Tips at the top of every new batch file. Agents read this file on every job and reel
+// updates itself, so this is how they learn about new features without new instructions:
+// keep it short and current.
+export const TIPS = [
+  "# B-roll: broll: [\"phrase\"] or { at: \"phrase\", q: \"air conditioning\" }; write q as 1-3 common keywords, the way stock clips are tagged.",
+  "#   A named person, place, brand or event: { at: \"Elon\", photo: \"Elon Musk\" } (a real photo from Wikipedia / Wikimedia Commons). Photos fill the screen and pan slowly.",
+  "#   Never use AI images or video and never download B-roll yourself: reel finds it and refuses anything AI-made.",
+  "# These tips change as reel updates (it updates itself): when they differ from older instructions, follow these.",
+];
+
 // Transcribes videos and writes a batch file with every transcript inline as comments,
 // so an agent reads one file, fills in hooks and drops, and renders. Suggested retakes
 // are pre-filled in drop.
@@ -18,7 +28,8 @@ export async function newBatch(batchFile, inputs, { ws = process.cwd(), use = "w
   const out = [
     "# reel batch: write each hook (shown 0-4s), list the line numbers to cut in drop, then run: reel render " + path.relative(ws, dest),
     "# Transcript lines below are `n start text`; R>n = likely retake (redone in line n), pre-filled in drop. Remove from drop to keep.",
-    "# More: broll, texts, highlight, music... see `reel help spec`.",
+    ...TIPS,
+    "# More: texts, highlight, music... see `reel help spec`.",
     `use: ${YAML.stringify(use, { lineWidth: 0 }).trim()}`,
     "out: out",
     "videos:",

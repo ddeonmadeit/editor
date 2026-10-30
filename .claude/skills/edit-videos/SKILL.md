@@ -11,7 +11,8 @@ watch videos, extract frames, or write ffmpeg commands yourself: that is what bu
 ## The whole job (3 commands)
 
 1. `reel new edit.yaml <videos or folder>`
-   Transcribes every video (cached) and writes `edit.yaml` with each transcript inline as
+   Transcribes every video (cached) and writes `edit.yaml` with tips at the top (they track
+   reel's latest features; follow them) and each transcript inline as
    numbered comment lines `n start text`. `R>n` marks a likely fumbled take (redone in line
    n); those are already in `drop`.
 2. Read `edit.yaml` once, then fill in each video in one edit:
